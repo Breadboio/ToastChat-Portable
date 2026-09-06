@@ -16,7 +16,7 @@ AZ="${AZAHAR_ROOT:-$HOME/tools/squashfs-root}"
 OUT="${OUT_DIR:-$PWD/build/emu}"
 SECS="${SECS:-35}"
 mkdir -p "$OUT"
-docker run --rm --network host \
+docker run --rm --user "$(id -u):$(id -g)" --network host \
   -v "$AZ":/azahar:ro -v "$PWD/build/3ds":/rom:ro -v "$OUT":/out \
   azahar-headless:v2 bash -c "
 export LD_LIBRARY_PATH=/azahar/usr/lib QT_PLUGIN_PATH=/azahar/usr/plugins HOME=/tmp/azhome

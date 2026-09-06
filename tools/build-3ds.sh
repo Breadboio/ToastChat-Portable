@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")/.."
 HOST="${TC_HOST:-192.168.1.167}"
 PORT="${TC_PORT:-3401}"
-docker run --rm -v "$PWD":/src -w /src -e HOST="$HOST" -e PORT="$PORT" \
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src -w /src -e HOST="$HOST" -e PORT="$PORT" \
   devkitpro/devkitarm:latest sh -c '
 set -e
 DKP=/opt/devkitpro
