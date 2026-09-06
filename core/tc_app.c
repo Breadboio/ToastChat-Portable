@@ -30,7 +30,7 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
     tc_ws ws;
     tc_rect cv;
     tc_pointer p, prev;
-    int connected = 0, drawing = 0;
+    int connected = 0, drawing = 0, dirty = 1;
     char status[48];
     char m[160];
     char nickbuf[TC_NICK_LIMIT + 1];
@@ -119,7 +119,7 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
 
         if (connected) {
             int r = tc_ws_poll(&ws);
-            if (r < 0) { connected = 0; ui.connected = 0; strcpy(status, "DISCONNECTED"); }
+            if (r < 0) { connected = 0; ui.connected = 0; strcpy(status, "DISCONNECTED"); dirty = 1; }
             else if (r == 1) {
                 const char *s = (const char *)ws.msg;
                 const char *users;
@@ -146,9 +146,11 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
                     strcpy(status, "SERVER SAID NO");
                 }
                 ws.msg_len = 0;
+                dirty = 1;
             }
         }
 
+        if (p.down || prev.down) dirty = 1;
         if (p.down && !prev.down) {
             if (hit(cv, p.x, p.y)) {
                 tc_canvas_begin(&canvas, p.x - cv.x, p.y - cv.y,
@@ -181,6 +183,11 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
             drawing = 0;
         }
         prev = p;
+
+        /* The screen is static most frames - drawing every one costs about two
+         * thirds of the frame rate on a 3DS for no visible benefit. */
+        if (!dirty) { tc_video_present(); continue; }
+        dirty = 0;
 
         if (dual) {
             tc_ui_render_bottom(&ui, screen, W, H);

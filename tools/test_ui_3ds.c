@@ -40,8 +40,15 @@ int main(void) {
         tc_canvas_end(&t);
         memset(thumb, 0, sizeof(thumb));
         tc_canvas_render(&t, thumb, 100, 58);
-        strcpy(ui.log[0].nick, "Breadboi"); ui.log[0].w = 100; ui.log[0].h = 58; ui.log[0].rgba = thumb;
-        strcpy(ui.log[1].nick, "Wii");      ui.nlog = 2;
+        /* newest first, as tc_recv builds it */
+        strcpy(ui.log[0].nick, "Breadboi");
+        ui.log[0].w = 100; ui.log[0].h = 58; ui.log[0].stride = 100;
+        ui.log[0].rgba = thumb; ui.log[0].color = TC_PALETTE[8];
+        ui.log[1].is_sys = 1; strcpy(ui.log[1].text, "Wii entered Room C.");
+        strcpy(ui.log[2].nick, "Wii");
+        ui.log[2].w = 100; ui.log[2].h = 58; ui.log[2].stride = 100;
+        ui.log[2].rgba = thumb; ui.log[2].color = TC_PALETTE[2];
+        ui.nlog = 3;
         tc_canvas_free(&t);
     }
     ui.connected = 1; ui.room = 'C'; ui.people = 3; ui.max = 16;

@@ -7,6 +7,9 @@
 
 typedef struct {
     char           nick[12];
+    uint32_t       color;        /* the sender's DS colour, for the name chip */
+    int            is_sys;       /* system line: render as an italic notice   */
+    char           text[40];     /* system line text                          */
     int            w, h;         /* pixels actually used inside the buffer   */
     int            stride;       /* buffer row width; >= w (thumbnails are
                                   * decoded into a fixed-size box)           */

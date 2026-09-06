@@ -11,13 +11,18 @@ static const char KEYS[TC_KB_ROWS][TC_KB_COLS + 1] = {
     "456789 -\b\n"
 };
 
-#define BG      0x11151c
-#define PANEL   0x1b212b
-#define EDGE    0x2c3542
-#define INK     0xd8dee9
-#define DIM     0x7c8797
-#define OK      0x4faa3c
-#define PAPER   0xf4f1e8
+/* Same light PictoChat palette as tc_ui.c, from the web client's ds.css. */
+#define BG      0xeef3fa   /* --pc-panel   */
+#define PANEL   0xffffff   /* --pc-card    */
+#define EDGE    0xc2ccdb   /* --pc-divider */
+#define INK     0x2b3340   /* --pc-ink     */
+#define DIM     0x64748b   /* --pc-ink-soft*/
+#define OK      0x2f6fd0   /* --pc-accent  */
+#define PAPER   0xffffff
+#define CHROME    0xc3cfe0
+#define CHROME_HI 0xe2e9f3
+#define HEADING   0x33405a
+#define LINE      0x94a3b8
 
 static void px(uint8_t *b, int W, int H, int x, int y, uint32_t c) {
     uint8_t *p;
@@ -70,14 +75,29 @@ void tc_keyboard_render(uint8_t *rgba, int W, int H, const char *nick, int nick_
     int tsc = W < 400 ? 1 : 2;
 
     fill(rgba, W, H, 0, 0, W, H, BG);
-    text(rgba, W, H, pad, pad, "PICK A NAME", INK, tsc);
+    /* chrome header, matching the main screen */
+    {
+        int bh = 16 * tsc + 8;
+        int j;
+        for (j = 0; j < bh; j++) {
+            int r0 = (int)((CHROME_HI >> 16) & 0xFF), r1 = (int)((CHROME >> 16) & 0xFF);
+            int g0 = (int)((CHROME_HI >> 8) & 0xFF),  g1 = (int)((CHROME >> 8) & 0xFF);
+            int b0 = (int)(CHROME_HI & 0xFF),         b1 = (int)(CHROME & 0xFF);
+            uint32_t c = (uint32_t)(r0 + (r1 - r0) * j / (bh - 1)) << 16 |
+                         (uint32_t)(g0 + (g1 - g0) * j / (bh - 1)) << 8  |
+                         (uint32_t)(b0 + (b1 - b0) * j / (bh - 1));
+            fill(rgba, W, H, 0, j, W, 1, c);
+        }
+        fill(rgba, W, H, 0, bh - 1, W, 1, LINE);
+        text(rgba, W, H, pad, (bh - 16 * tsc) / 2, "PICK A NAME", HEADING, tsc);
+    }
 
     /* the name box */
     {
-        int bh = 20 * tsc, by = pad + 20 * tsc;
+        int bh = 20 * tsc, by = 16 * tsc + 8 + pad;
         fill(rgba, W, H, pad, by, W - pad * 2, bh, PAPER);
         frame(rgba, W, H, pad, by, W - pad * 2, bh, EDGE);
-        text(rgba, W, H, pad + 8, by + (bh - 16 * tsc) / 2, *nick ? nick : "", 0x11151c, tsc);
+        text(rgba, W, H, pad + 8, by + (bh - 16 * tsc) / 2, *nick ? nick : "", INK, tsc);
         /* caret */
         fill(rgba, W, H, pad + 8 + (int)strlen(nick) * 8 * tsc, by + 4, 2 * tsc, bh - 8, DIM);
         {
@@ -98,8 +118,8 @@ void tc_keyboard_render(uint8_t *rgba, int W, int H, const char *nick, int nick_
             char k = KEYS[r][c];
             const char *label;
             char one[2];
-            uint32_t bgc = PANEL;
-            if (k == '\n') { bgc = OK; label = "OK"; }
+            uint32_t bgc = PANEL, ink = INK;
+            if (k == '\n') { bgc = OK; ink = 0xffffff; label = "OK"; }
             else if (k == '\b') { label = "<-"; }
             else if (k == ' ') { label = "SP"; }
             else { one[0] = k; one[1] = '\0'; label = one; }
@@ -107,7 +127,7 @@ void tc_keyboard_render(uint8_t *rgba, int W, int H, const char *nick, int nick_
             frame(rgba, W, H, x + 1, y + 1, cw - 2, ch - 2, EDGE);
             {
                 int lw = (int)strlen(label) * 8 * sc;
-                text(rgba, W, H, x + (cw - lw) / 2, y + (ch - 16 * sc) / 2, label, INK, sc);
+                text(rgba, W, H, x + (cw - lw) / 2, y + (ch - 16 * sc) / 2, label, ink, sc);
             }
         }
     }
@@ -116,8 +136,8 @@ void tc_keyboard_render(uint8_t *rgba, int W, int H, const char *nick, int nick_
 void tc_keyboard_render_top(uint8_t *rgba, int W, int H, const char *nick) {
     int sc = W < 500 ? 2 : 3;
     int cx = (W - 9 * 8 * sc) / 2;
-    fill(rgba, W, H, 0, 0, W, H, BG);
-    text(rgba, W, H, cx, H / 2 - 40, "TOASTCHAT", INK, sc);
+    fill(rgba, W, H, 0, 0, W, H, PAPER);
+    text(rgba, W, H, cx, H / 2 - 40, "TOASTCHAT", HEADING, sc);
     text(rgba, W, H, (W - 21 * 8) / 2, H / 2 + 4, "TAP LETTERS BELOW,", DIM, 1);
     text(rgba, W, H, (W - 21 * 8) / 2, H / 2 + 22, "THEN OK TO CONNECT.", DIM, 1);
     if (*nick) {

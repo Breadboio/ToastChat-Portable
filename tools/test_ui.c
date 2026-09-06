@@ -61,9 +61,14 @@ static void render_one(const char *out, int w, int h) {
         tc_canvas_end(&t);
         memset(thumb, 0, sizeof(thumb));
         tc_canvas_render(&t, thumb, 120, 90);
-        strcpy(ui.log[0].nick, "Breadboi"); ui.log[0].w = 120; ui.log[0].h = 90; ui.log[0].rgba = thumb;
-        strcpy(ui.log[1].nick, "Switch");   ui.log[1].w = 0;   ui.log[1].h = 0;  ui.log[1].rgba = NULL;
-        ui.nlog = 2;
+        strcpy(ui.log[0].nick, "Breadboi");
+        ui.log[0].w = 120; ui.log[0].h = 90; ui.log[0].stride = 120;
+        ui.log[0].rgba = thumb; ui.log[0].color = TC_PALETTE[8];
+        ui.log[1].is_sys = 1; strcpy(ui.log[1].text, "Switch entered Room C.");
+        strcpy(ui.log[2].nick, "Switch");
+        ui.log[2].w = 120; ui.log[2].h = 90; ui.log[2].stride = 120;
+        ui.log[2].rgba = thumb; ui.log[2].color = TC_PALETTE[11];
+        ui.nlog = 3;
         tc_canvas_free(&t);
     }
 

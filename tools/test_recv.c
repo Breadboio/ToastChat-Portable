@@ -38,26 +38,31 @@ int main(void) {
         "{\"t\":\"joined\",\"room\":\"C\",\"users\":[{\"n\":\"a\"}],\"log\":["
         "{\"kind\":\"sys\",\"id\":\"1\",\"text\":\"a entered Room C.\"},"
         "{\"kind\":\"sys\",\"id\":\"2\",\"text\":\"b entered Room C.\"},"
-        "{\"kind\":\"msg\",\"id\":\"3\",\"nick\":\"Alice\",\"w\":40,\"h\":20,\"png\":\"%s\"},"
+        "{\"kind\":\"msg\",\"id\":\"3\",\"nick\":\"Alice\",\"color\":\"#2f7d34\",\"w\":40,\"h\":20,\"png\":\"%s\"},"
         "{\"kind\":\"sys\",\"id\":\"4\",\"text\":\"c entered Room C.\"},"
-        "{\"kind\":\"msg\",\"id\":\"5\",\"nick\":\"Bob\",\"w\":20,\"h\":40,\"png\":\"%s\"},"
+        "{\"kind\":\"msg\",\"id\":\"5\",\"nick\":\"Bob\",\"color\":\"#c8352b\",\"w\":20,\"h\":40,\"png\":\"%s\"},"
         "{\"kind\":\"sys\",\"id\":\"6\",\"text\":\"d left Room C.\"}]}", p1, p2);
 
     memset(&ui, 0, sizeof(ui));
     puts("== receive path ==");
     tc_recv_replay(&ui, pool, doc);
-    eq("2 drawings from a 6-entry log", ui.nlog, 2);
-    eq("newest first: log[0] is Bob", strcmp(ui.log[0].nick, "Bob") == 0, 1);
-    eq("log[1] is Alice", strcmp(ui.log[1].nick, "Alice") == 0, 1);
-    eq("log[0] decoded", ui.log[0].rgba != NULL, 1);
-    eq("log[1] decoded", ui.log[1].rgba != NULL, 1);
-    eq("portrait keeps aspect (20x40 -> h>w)", ui.log[0].h > ui.log[0].w, 1);
-    eq("landscape keeps aspect (40x20 -> w>h)", ui.log[1].w > ui.log[1].h, 1);
-    eq("distinct pool slots", ui.log[0].rgba != ui.log[1].rgba, 1);
+    /* system lines are kept and shown, the way PictoChat shows them */
+    eq("all 6 entries kept", ui.nlog, 6);
+    eq("newest first: log[0] is the last sys line", ui.log[0].is_sys, 1);
+    eq("log[0] text", strcmp(ui.log[0].text, "d left Room C.") == 0, 1);
+    eq("log[1] is Bob", strcmp(ui.log[1].nick, "Bob") == 0, 1);
+    eq("log[3] is Alice", strcmp(ui.log[3].nick, "Alice") == 0, 1);
+    eq("sys rows carry no image", ui.log[0].rgba == NULL, 1);
+    eq("Bob decoded", ui.log[1].rgba != NULL, 1);
+    eq("Alice decoded", ui.log[3].rgba != NULL, 1);
+    eq("portrait keeps aspect (20x40 -> h>w)", ui.log[1].h > ui.log[1].w, 1);
+    eq("landscape keeps aspect (40x20 -> w>h)", ui.log[3].w > ui.log[3].h, 1);
+    eq("distinct pool slots", ui.log[1].rgba != ui.log[3].rgba, 1);
+    eq("colour parsed from the entry", ui.log[1].color != 0, 1);
 
     /* replay must not accumulate across calls */
     tc_recv_replay(&ui, pool, doc);
-    eq("replay resets rather than appends", ui.nlog, 2);
+    eq("replay resets rather than appends", ui.nlog, 6);
 
     /* live entries push onto the front and cap at TC_UI_LOG_MAX */
     {
@@ -67,13 +72,15 @@ int main(void) {
         for (i = 0; i < 10; i++) tc_recv_push(&ui, pool, e);
         eq("capped at TC_UI_LOG_MAX", ui.nlog, TC_UI_LOG_MAX);
         eq("front is the newest", strcmp(ui.log[0].nick, "New") == 0, 1);
+        eq("newest decoded after shifting", ui.log[0].rgba != NULL, 1);
         free(e);
     }
-    /* a system line must not create an entry */
+    /* a system line becomes a text row, not a drawing */
     {
-        int before = ui.nlog;
         tc_recv_push(&ui, pool, "{\"kind\":\"sys\",\"text\":\"x entered\"}");
-        eq("sys line ignored", ui.nlog, before);
+        eq("sys line becomes a row", ui.log[0].is_sys, 1);
+        eq("sys row has no image", ui.log[0].rgba == NULL, 1);
+        eq("sys text captured", strcmp(ui.log[0].text, "x entered") == 0, 1);
     }
     printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASS", fails, fails == 1 ? "" : "s");
     return fails ? 1 : 0;
