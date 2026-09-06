@@ -16,6 +16,7 @@ static int hit(tc_rect r, int x, int y) {
 }
 
 #define TC_NICK_LIMIT 10   /* server truncates past this */
+#define TC_BUFFERS     2   /* 3DS/Wii/Switch all double-buffer */
 
 int tc_app_run(int W, int H, const char *host, int port, int use_tls,
                const char *room, const char *nick, const char *hint) {
@@ -30,7 +31,14 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
     tc_ws ws;
     tc_rect cv;
     tc_pointer p, prev;
-    int connected = 0, drawing = 0, dirty = 1;
+    int connected = 0, drawing = 0;
+    /* Frames still owed a redraw. Consoles are double-buffered, so ONE draw
+     * after a change updates only one of the two buffers; the other still holds
+     * the previous frame. Anything that then swaps shows them alternately -
+     * which is exactly the "top screen flickers until I draw again" report.
+     * Drawing TC_BUFFERS times after every change makes both buffers current,
+     * so it cannot matter what any platform's present() does. */
+    int redraw = TC_BUFFERS;
     int room_idx = 0;
     uint32_t last_scroll = 0;
     char status[48];
@@ -122,7 +130,7 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
 
         if (connected) {
             int r = tc_ws_poll(&ws);
-            if (r < 0) { connected = 0; ui.connected = 0; strcpy(status, "DISCONNECTED"); dirty = 1; }
+            if (r < 0) { connected = 0; ui.connected = 0; strcpy(status, "DISCONNECTED"); redraw = TC_BUFFERS; }
             else if (r == 1) {
                 const char *s = (const char *)ws.msg;
                 const char *users;
@@ -155,7 +163,7 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
                     strcpy(status, "SERVER SAID NO");
                 }
                 ws.msg_len = 0;
-                dirty = 1;
+                redraw = TC_BUFFERS;
             }
         }
 
@@ -169,11 +177,11 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
                 if (maxs < 0) maxs = 0;
                 if (want < 0) want = 0;
                 if (want > maxs) want = maxs;
-                if (want != ui.scroll) { ui.scroll = want; dirty = 1; }
+                if (want != ui.scroll) { ui.scroll = want; redraw = TC_BUFFERS; }
                 last_scroll = now;
             }
         }
-        if (p.down || prev.down) dirty = 1;
+        if (p.down || prev.down) redraw = TC_BUFFERS;
         if (p.down && !prev.down) {
             if (hit(cv, p.x, p.y)) {
                 tc_canvas_begin(&canvas, p.x - cv.x, p.y - cv.y,
@@ -218,10 +226,10 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
 
         /* The screen is static most frames - drawing every one costs about two
          * thirds of the frame rate on a 3DS for no visible benefit. */
-        if (!dirty) { tc_video_wait(); continue; }   /* wait, do NOT present:
-                                                       * see platform.h */
-        dirty = 0;
-
+        /* Nothing owed: wait WITHOUT presenting. Presenting here would swap to
+         * the other buffer, which is the same bug from the other direction. */
+        if (redraw <= 0) { tc_video_wait(); continue; }
+        redraw--;
         if (dual) {
             tc_ui_render_bottom(&ui, screen, W, H);
             tc_ui_render_top(&ui, screen_top, topw, toph);
