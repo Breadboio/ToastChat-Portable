@@ -18,6 +18,33 @@ void tc_ws_accept_for(const char *key, char out[32]) {
     tc_b64_encode(d, 20, out);
 }
 
+static int wr(tc_ws *w, const void *b, size_t n) {
+    return w->tls ? tc_tls_send(w->tls, b, n) : tc_sock_send(w->sock, b, n);
+}
+static int rd(tc_ws *w, void *b, size_t n) {
+    return w->tls ? tc_tls_recv(w->tls, b, n) : tc_sock_recv(w->sock, b, n);
+}
+
+/* HTTP header names are case-insensitive, and proxies do re-case them: Node's
+ * `ws` sends "Sec-WebSocket-Accept" but nginx forwards "Sec-Websocket-Accept".
+ * A case-sensitive search works against the dev server and fails against prod. */
+static char *tc_stristr(char *hay, const char *needle) {
+    size_t n = strlen(needle);
+    if (!n) return hay;
+    for (; *hay; hay++) {
+        size_t i = 0;
+        while (i < n) {
+            char a = hay[i], b = needle[i];
+            if (a >= 'A' && a <= 'Z') a = (char)(a - 'A' + 'a');
+            if (b >= 'A' && b <= 'Z') b = (char)(b - 'A' + 'a');
+            if (a != b) break;
+            i++;
+        }
+        if (i == n) return hay;
+    }
+    return NULL;
+}
+
 /* memmem is a GNU extension; newlib (Switch/3DS/Wii) does not have it. */
 static uint8_t *tc_find(uint8_t *h, size_t hn, const char *n, size_t nn) {
     size_t i;
@@ -45,7 +72,7 @@ static int rx_reserve(tc_ws *w, size_t extra) {
     return 0;
 }
 
-int tc_ws_connect(tc_ws *w, const char *host, int port, const char *path) {
+int tc_ws_connect(tc_ws *w, const char *host, int port, const char *path, int use_tls) {
     uint8_t nonce[16];
     char key[32], want[32], req[512];
     int i, n;
@@ -59,18 +86,22 @@ int tc_ws_connect(tc_ws *w, const char *host, int port, const char *path) {
 
     w->sock = tc_sock_open(host, port);
     if (!w->sock) return -1;
+    if (use_tls) {
+        w->tls = tc_tls_connect(w->sock, host);
+        if (!w->tls) { tc_log("ws: tls failed: %s", tc_tls_error()); return -9; }
+    }
 
     n = snprintf(req, sizeof(req),
         "GET %s HTTP/1.1\r\nHost: %s:%d\r\nUpgrade: websocket\r\n"
         "Connection: Upgrade\r\nSec-WebSocket-Key: %s\r\n"
         "Sec-WebSocket-Version: 13\r\n\r\n", path, host, port, key);
-    if (tc_sock_send(w->sock, req, (size_t)n) != n) return -2;
+    if (wr(w, req, (size_t)n) != n) return -2;
 
     /* Read until end of headers. */
     for (;;) {
         int r;
         if (rx_reserve(w, 1024) < 0) return -3;
-        r = tc_sock_recv(w->sock, w->rx + w->rx_len, 1024);
+        r = rd(w, w->rx + w->rx_len, 1024);
         if (r < 0) return -4;
         if (r > 0) w->rx_len += (size_t)r;
         if (w->rx_len >= 4) {
@@ -83,11 +114,11 @@ int tc_ws_connect(tc_ws *w, const char *host, int port, const char *path) {
         char head[8193];
         char *acc;
         memcpy(head, w->rx, used); head[used] = '\0';
-        if (strncmp(head, "HTTP/1.1 101", 12) != 0) {
+        if (strncmp(head, "HTTP/1.1 101", 12) != 0 && strncmp(head, "HTTP/1.0 101", 12) != 0) {
             tc_log("ws: server did not upgrade: %.40s", head);
             return -6;
         }
-        acc = strstr(head, "Sec-WebSocket-Accept:");
+        acc = tc_stristr(head, "sec-websocket-accept:");
         if (!acc) return -7;
         acc += 21; while (*acc == ' ') acc++;
         if (strncmp(acc, want, strlen(want)) != 0) {
@@ -112,12 +143,12 @@ int tc_ws_send_text(tc_ws *w, const char *s, size_t n) {
     else { int k; hdr[h++] = 0x80 | 127;
         for (k = 7; k >= 0; k--) hdr[h++] = (uint8_t)((uint64_t)n >> (k * 8)); }
     for (i = 0; i < 4; i++) { mask[i] = (uint8_t)(xs(w) >> 13); hdr[h++] = mask[i]; }
-    if (tc_sock_send(w->sock, hdr, h) != (int)h) return -2;
+    if (wr(w, hdr, h) != (int)h) return -2;
 
     body = (uint8_t *)tc_alloc(n ? n : 1);
     if (!body) return -3;
     for (i = 0; i < n; i++) body[i] = (uint8_t)s[i] ^ mask[i & 3];
-    { int r = tc_sock_send(w->sock, body, n); tc_free(body);
+    { int r = wr(w, body, n); tc_free(body);
       if (r != (int)n) return -4; }
     return 0;
 }
@@ -128,18 +159,18 @@ static int send_pong(tc_ws *w, const uint8_t *p, size_t n) {
     hdr[h++] = (uint8_t)(0x80 | (n < 126 ? n : 125));
     if (n > 125) n = 125;
     for (i = 0; i < 4; i++) { mask[i] = (uint8_t)(xs(w) >> 13); hdr[h++] = mask[i]; }
-    if (tc_sock_send(w->sock, hdr, h) != (int)h) return -1;
+    if (wr(w, hdr, h) != (int)h) return -1;
     b = (uint8_t *)tc_alloc(n ? n : 1);
     if (!b) return -1;
     for (i = 0; i < n; i++) b[i] = p[i] ^ mask[i & 3];
-    { int r = tc_sock_send(w->sock, b, n); tc_free(b); return r == (int)n ? 0 : -1; }
+    { int r = wr(w, b, n); tc_free(b); return r == (int)n ? 0 : -1; }
 }
 
 int tc_ws_poll(tc_ws *w) {
     int r;
     if (!w->open) return -1;
     if (rx_reserve(w, 4096) < 0) return -1;
-    r = tc_sock_recv(w->sock, w->rx + w->rx_len, 4096);
+    r = rd(w, w->rx + w->rx_len, 4096);
     if (r < 0) { w->open = 0; return -1; }
     w->rx_len += (size_t)r;
 
@@ -185,6 +216,7 @@ int tc_ws_poll(tc_ws *w) {
 }
 
 void tc_ws_close(tc_ws *w) {
+    if (w->tls) tc_tls_free(w->tls);
     if (w->sock) tc_sock_close(w->sock);
     tc_free(w->rx); tc_free(w->msg);
     memset(w, 0, sizeof(*w));

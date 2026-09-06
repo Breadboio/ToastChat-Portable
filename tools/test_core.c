@@ -22,6 +22,8 @@ int main(int argc, char **argv) {
     const char *host = argc > 1 ? argv[1] : "127.0.0.1";
     int port = argc > 2 ? atoi(argv[2]) : 3401;
     const char *room = argc > 3 ? argv[3] : "C";
+    int use_tls = argc > 4 ? atoi(argv[4]) : 0;
+    const char *path = use_tls ? "/toastchat/ws" : "/ws";
 
     puts("== unit: SHA-1 ==");
     {   /* FIPS 180-1 vectors */
@@ -63,7 +65,7 @@ int main(int argc, char **argv) {
     {
         tc_ws w; int r, got_hello = 0, got_joined = 0, spins = 0;
         char buf[256];
-        r = tc_ws_connect(&w, host, port, "/ws");
+        r = tc_ws_connect(&w, host, port, path, use_tls);
         ck("handshake (101 + accept match)", r == 0, r == 0 ? "ok" : "err", "ok");
         if (r != 0) { printf("\nconnect failed rc=%d\n", r); return 1; }
 

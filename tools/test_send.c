@@ -12,10 +12,12 @@
 int main(int argc, char **argv) {
     const char *host = argc > 1 ? argv[1] : "127.0.0.1";
     int port = argc > 2 ? atoi(argv[2]) : 3401;
+    int use_tls = argc > 3 ? atoi(argv[3]) : 0;
+    const char *path = use_tls ? "/toastchat/ws" : "/ws";
     tc_ws ws; tc_canvas c; char m[128]; int i, spins = 0, sent = 0, echoed = 0;
     tc_rect cv = tc_ui_canvas_rect(1280, 720);
 
-    if (tc_ws_connect(&ws, host, port, "/ws") != 0) { puts("connect FAILED"); return 1; }
+    if (tc_ws_connect(&ws, host, port, path, use_tls) != 0) { puts("connect FAILED"); return 1; }
     puts("connected");
     snprintf(m, sizeof(m), "{\"t\":\"identify\",\"nick\":\"Switch\",\"color\":\"#2fa89a\"}");
     tc_ws_send_text(&ws, m, strlen(m));

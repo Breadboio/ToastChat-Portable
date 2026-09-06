@@ -64,7 +64,14 @@ void *tc_alloc(size_t n);
 void *tc_realloc(void *p, size_t n);
 void  tc_free(void *p);
 
-/* ---- 6. logging --------------------------------------------------------- */
+/* ---- 6. randomness ------------------------------------------------------
+ * Needed to seed TLS. Must come from the platform's real entropy source:
+ * PS_GenerateRandomBytes on 3DS, randomGet on Switch, /dev/urandom on POSIX.
+ * Returns 0 on success. A port that cannot provide this must not enable TLS.
+ */
+int tc_random(void *buf, size_t n);
+
+/* ---- 7. logging --------------------------------------------------------- */
 void tc_log(const char *fmt, ...);
 
 #endif /* TC_PLATFORM_H */

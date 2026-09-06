@@ -82,11 +82,12 @@ void tc_sock_close(tc_sock *s) { if (s) { close(s->fd); free(s); } }
 
 /* ---- video ------------------------------------------------------------ */
 void tc_3ds_video_init(void) {
+    psInit();              /* hardware RNG, needed to seed TLS */
     gfxInitDefault();
     memset(&g_ptr, 0, sizeof(g_ptr));
     g_quit = 0;
 }
-void tc_3ds_video_exit(void) { gfxExit(); }
+void tc_3ds_video_exit(void) { gfxExit(); psExit(); }
 
 void tc_video_size(tc_screen which, int *w, int *h) {
     *w = (which == TC_SCREEN_TOP) ? 400 : 320;
@@ -141,6 +142,10 @@ int  tc_input_quit(void) { return g_quit; }
 /* ---- time / memory / log ---------------------------------------------- */
 uint32_t tc_millis(void)          { return (uint32_t)(svcGetSystemTick() / 268123); }
 void     tc_sleep_ms(uint32_t ms) { svcSleepThread((s64)ms * 1000000LL); }
+int      tc_random(void *buf, size_t n) {
+    /* psInit() is done once in tc_3ds_video_init; PS is the hardware RNG. */
+    return R_SUCCEEDED(PS_GenerateRandomBytes(buf, n)) ? 0 : -1;
+}
 void    *tc_alloc(size_t n)       { return malloc(n); }
 void    *tc_realloc(void *p, size_t n) { return realloc(p, n); }
 void     tc_free(void *p)         { free(p); }

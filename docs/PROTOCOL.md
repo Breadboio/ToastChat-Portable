@@ -90,6 +90,24 @@ An `entry` of kind `msg` carries the PNG **inline as a base64 data URL** in
 A full 40-entry log arrives in one `joined` message — that is the largest
 allocation a port will face. Budget for it, or join and immediately trim.
 
+## 4b. TLS, and reaching the public server
+
+`wss://breadtoasting.com/toastchat/ws` works from a console client, verified.
+The trick is to **bring your own TLS**: the client links mbedtls (a devkitPro
+portlib for 3DS, Switch and Wii U - there is none for Wii) and embeds its own
+trust anchors in `core/tc_cacert.h`. That makes the earlier blocker moot - the
+console's 2011-vintage root store and its limited cipher support never come into
+it, because we never ask the console to do TLS. Regenerate the anchors with
+`tools/mkca.py <host>` if the server changes CA.
+
+**Header casing bites here.** Node's `ws` replies `Sec-WebSocket-Accept`, but
+nginx forwards it as `Sec-Websocket-Accept`. A case-sensitive match works
+perfectly against the dev container and fails against prod. HTTP header names
+are case-insensitive; compare them that way.
+
+Path also differs: straight to the container it is `/ws`; through unified-nginx
+the browser and the client must ask for `/toastchat/ws`.
+
 ## 5. The HTTP side (useful, but not sufficient)
 
     GET /healthz                 -> {"ok":true,"rooms":{...}}

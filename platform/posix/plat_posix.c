@@ -74,6 +74,14 @@ void tc_sleep_ms(uint32_t ms) {
     struct timespec ts; ts.tv_sec = ms / 1000; ts.tv_nsec = (long)(ms % 1000) * 1000000L;
     nanosleep(&ts, NULL);
 }
+int tc_random(void *buf, size_t n) {
+    FILE *f = fopen("/dev/urandom", "rb");
+    size_t got;
+    if (!f) return -1;
+    got = fread(buf, 1, n, f);
+    fclose(f);
+    return got == n ? 0 : -1;
+}
 void *tc_alloc(size_t n) { return malloc(n); }
 void *tc_realloc(void *p, size_t n) { return realloc(p, n); }
 void  tc_free(void *p) { free(p); }

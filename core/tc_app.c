@@ -11,8 +11,12 @@ static int hit(tc_rect r, int x, int y) {
     return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
 }
 
-int tc_app_run(int W, int H, const char *host, int port, const char *room,
-               const char *nick, const char *hint) {
+int tc_app_run(int W, int H, const char *host, int port, int use_tls,
+               const char *room, const char *nick, const char *hint) {
+    /* Behind unified-nginx the app is mounted at /toastchat/ and the proxy
+     * strips the prefix, so the browser (and we) must ask for
+     * /toastchat/ws. Straight to the container it is just /ws. */
+    const char *path = use_tls ? "/toastchat/ws" : "/ws";
     uint8_t *screen, *screen_top = NULL;
     int topw = 0, toph = 0, dual;
     tc_canvas canvas;
@@ -43,7 +47,7 @@ int tc_app_run(int W, int H, const char *host, int port, const char *room,
     ui.canvas = &canvas; ui.status = status;
     strcpy(status, "CONNECTING");
 
-    if (tc_ws_connect(&ws, host, port, "/ws") != 0) {
+    if (tc_ws_connect(&ws, host, port, path, use_tls) != 0) {
         strcpy(status, "CONNECT FAILED");
     } else {
         connected = 1;

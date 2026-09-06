@@ -159,6 +159,16 @@ int  tc_input_quit(void) { return g_quit; }
 /* ---- time / memory / log ---------------------------------------------- */
 uint32_t tc_millis(void)          { return (uint32_t)ticks_to_millisecs(gettime()); }
 void     tc_sleep_ms(uint32_t ms) { usleep((useconds_t)ms * 1000); }
+/* NOT cryptographic. devkitPro ships no mbedtls portlib for Wii, so TLS is
+ * not built here and nothing security-relevant consumes this. If Wii ever
+ * gains TLS, replace this with a real entropy source first. */
+int      tc_random(void *buf, size_t n) {
+    uint8_t *p = (uint8_t *)buf;
+    size_t i;
+    uint32_t s = (uint32_t)gettime() ^ (uint32_t)(uintptr_t)buf;
+    for (i = 0; i < n; i++) { s ^= s << 13; s ^= s >> 17; s ^= s << 5; p[i] = (uint8_t)s; }
+    return 0;
+}
 void    *tc_alloc(size_t n)       { return malloc(n); }
 void    *tc_realloc(void *p, size_t n) { return realloc(p, n); }
 void     tc_free(void *p)         { free(p); }

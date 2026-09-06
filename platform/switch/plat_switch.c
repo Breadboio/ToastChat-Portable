@@ -66,6 +66,7 @@ void tc_sock_close(tc_sock *s) { if (s) { close(s->fd); free(s); } }
 
 uint32_t tc_millis(void)          { return (uint32_t)(armGetSystemTick() / 19200ULL); }
 void     tc_sleep_ms(uint32_t ms) { svcSleepThread((uint64_t)ms * 1000000ULL); }
+int      tc_random(void *buf, size_t n) { randomGet(buf, n); return 0; }
 void    *tc_alloc(size_t n)       { return malloc(n); }
 void    *tc_realloc(void *p, size_t n) { return realloc(p, n); }
 void     tc_free(void *p)         { free(p); }

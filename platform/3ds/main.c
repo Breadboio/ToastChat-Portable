@@ -13,6 +13,9 @@
 #ifndef TC_ROOM
 #define TC_ROOM "C"
 #endif
+#ifndef TC_TLS
+#define TC_TLS 0
+#endif
 
 void tc_3ds_video_init(void);
 void tc_3ds_video_exit(void);
@@ -24,7 +27,7 @@ int main(int argc, char **argv) {
     (void)argc; (void)argv;
     tc_3ds_video_init();
     tc_3ds_net_init();
-    rc = tc_app_run(320, 240, TC_HOST, TC_PORT, TC_ROOM, "3DS", "DRAW");
+    rc = tc_app_run(320, 240, TC_HOST, TC_PORT, TC_TLS, TC_ROOM, "3DS", "DRAW");
     tc_3ds_net_exit();
     tc_3ds_video_exit();
     return rc;
