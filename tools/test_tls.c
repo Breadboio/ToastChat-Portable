@@ -13,18 +13,19 @@ int main(int argc, char **argv) {
     const char *host = argc > 1 ? argv[1] : "breadtoasting.com";
     int port = argc > 2 ? atoi(argv[2]) : 443;
     const char *path = argc > 3 ? argv[3] : "/toastchat/ws";
+    int use_tls = argc > 4 ? atoi(argv[4]) : 1;
     tc_ws w;
     int rc, spins = 0;
 
     printf("TLS compiled in : %s\n", tc_tls_available() ? "yes" : "NO");
-    printf("connecting      : wss://%s:%d%s\n", host, port, path);
+    printf("connecting      : %s://%s:%d%s\n", use_tls ? "wss" : "ws", host, port, path);
 
-    rc = tc_ws_connect(&w, host, port, path, 1);
+    rc = tc_ws_connect(&w, host, port, path, use_tls);
     if (rc != 0) {
         printf("FAILED rc=%d (%s)\n", rc, tc_tls_error());
         return 1;
     }
-    puts("TLS handshake   : OK (certificate verified against bundled anchors)");
+    if (use_tls) puts("TLS handshake   : OK (certificate verified against bundled anchors)");
     puts("websocket       : 101 Switching Protocols, accept verified");
 
     while (spins++ < 500) {
@@ -35,7 +36,7 @@ int main(int argc, char **argv) {
             if (c) {
                 char *rooms = strstr((char *)w.msg, "\"rooms\"");
                 printf("server hello    : %.60s\n", rooms ? rooms : (char *)w.msg);
-                puts("\nPUBLIC SERVER REACHED OVER TLS (did not join any room)");
+                printf("\nPUBLIC SERVER REACHED OVER %s (did not join any room)\n", use_tls ? "TLS" : "PLAIN ws://");
                 tc_ws_close(&w);
                 return 0;
             }
