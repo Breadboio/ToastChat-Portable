@@ -39,6 +39,7 @@ so a port cannot get the protocol subtly wrong.
 
     platform/sdl2/       desktop dev target — build and iterate here first
     platform/3ds/        devkitARM + libctru + citro2d
+    platform/switch/     devkitA64 + libnx (touchscreen; easiest target - see its NOTES.md)
     platform/wiiu/       devkitPPC + wut
     platform/wii/        devkitPPC + libogc (IR pointer)
     platform/dreamcast/  KallistiOS, SH-4 (mouse or stick cursor)
@@ -73,7 +74,7 @@ Prefix with `!` in the Claude Code prompt so the output lands in the session.
     chmod +x install-devkitpro-pacman
     sudo ./install-devkitpro-pacman
     sudo dkp-pacman -Syu
-    sudo dkp-pacman -S --noconfirm 3ds-dev wii-dev wiiu-dev
+    sudo dkp-pacman -S --noconfirm 3ds-dev wii-dev wiiu-dev switch-dev
 
     # Azahar (3DS emulator) - AppImage, no sudo needed
     mkdir -p ~/tools && cd ~/tools
