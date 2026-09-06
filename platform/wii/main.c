@@ -28,5 +28,5 @@ int main(int argc, char **argv) {
     tc_wii_input_init();
     tc_video_size(TC_SCREEN_TOP, &w, &h);
     tc_wii_net_init();
-    return tc_app_run(w, h, TC_HOST, TC_PORT, TC_TLS, TC_ROOM, "Wii", "POINT + HOLD A");
+    return tc_app_run(w, h, TC_HOST, TC_PORT, TC_TLS, "Wii", "POINT + HOLD A");
 }

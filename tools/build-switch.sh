@@ -20,7 +20,7 @@ if [ "$TLS" = "1" ]; then
   LIBS="-L$DKP/portlibs/switch/lib -lmbedtls -lmbedx509 -lmbedcrypto $LIBS"
 fi
 mkdir -p build
-for f in core/tc_sha1.c core/tc_base64.c core/tc_ws.c core/tc_draw.c core/tc_ui.c core/tc_png.c core/tc_send.c core/tc_app.c core/tc_tls.c core/tc_json.c core/tc_imgdec.c core/tc_recv.c core/tc_keyboard.c platform/switch/plat_switch.c platform/switch/main.c; do
+for f in core/tc_sha1.c core/tc_base64.c core/tc_ws.c core/tc_draw.c core/tc_ui.c core/tc_png.c core/tc_send.c core/tc_app.c core/tc_tls.c core/tc_json.c core/tc_imgdec.c core/tc_recv.c core/tc_keyboard.c core/tc_lobby.c platform/switch/plat_switch.c platform/switch/main.c; do
   $CC $CFLAGS -c "$f" -o "build/$(basename $f .c).o"
 done
 $CC -specs=$DKP/libnx/switch.specs $ARCH build/*.o -L$DKP/libnx/lib $LIBS -o build/ToastChat.elf

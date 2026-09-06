@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
     (void)argc; (void)argv;
     tc_3ds_video_init();
     tc_3ds_net_init();
-    rc = tc_app_run(320, 240, TC_HOST, TC_PORT, TC_TLS, TC_ROOM, "3DS", "DRAW");
+    rc = tc_app_run(320, 240, TC_HOST, TC_PORT, TC_TLS, "3DS", "DRAW");
     tc_3ds_net_exit();
     tc_3ds_video_exit();
     return rc;

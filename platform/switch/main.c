@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
     socketInitializeDefault();
     tc_switch_video_init();
     tc_switch_input_init();
-    rc = tc_app_run(1280, 720, TC_HOST, TC_PORT, TC_TLS, TC_ROOM, "Switch", "TOUCH TO DRAW");
+    rc = tc_app_run(1280, 720, TC_HOST, TC_PORT, TC_TLS, "Switch", "TOUCH TO DRAW");
     socketExit();
     tc_switch_video_exit();
     return rc;

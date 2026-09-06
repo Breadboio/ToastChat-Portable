@@ -7,9 +7,23 @@
 #include "tc_imgdec.h"
 #include "tc_recv.h"
 #include "tc_keyboard.h"
+#include "tc_lobby.h"
 #include "../platform/platform.h"
 #include <string.h>
 #include <stdio.h>
+
+/* {"rooms":{"A":0,"B":2,...}} -> counts[4]. tc_json_top stops at the end of the
+ * object it is handed, so the nested object can be scanned directly. */
+static void parse_counts(const char *msg, int counts[4]) {
+    const char *rooms = tc_json_top(msg, "rooms");
+    int i;
+    if (!rooms) return;
+    for (i = 0; i < 4; i++) {
+        char key[2];
+        key[0] = (char)('A' + i); key[1] = '\0';
+        counts[i] = tc_json_top_int(rooms, key, counts[i]);
+    }
+}
 
 static int hit(tc_rect r, int x, int y) {
     return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
@@ -19,7 +33,7 @@ static int hit(tc_rect r, int x, int y) {
 #define TC_BUFFERS     2   /* 3DS/Wii/Switch all double-buffer */
 
 int tc_app_run(int W, int H, const char *host, int port, int use_tls,
-               const char *room, const char *nick, const char *hint) {
+               const char *nick, const char *hint) {
     /* Behind unified-nginx the app is mounted at /toastchat/ and the proxy
      * strips the prefix, so the browser (and we) must ask for
      * /toastchat/ws. Straight to the container it is just /ws. */
@@ -39,8 +53,9 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
      * Drawing TC_BUFFERS times after every change makes both buffers current,
      * so it cannot matter what any platform's present() does. */
     int redraw = TC_BUFFERS;
-    int room_idx = 0;
     uint32_t last_scroll = 0;
+    int counts[4];
+    int in_lobby = 1;            /* pick a room before joining one */
     char status[48];
     char m[160];
     char nickbuf[TC_NICK_LIMIT + 1];
@@ -48,6 +63,7 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
     memset(&ui, 0, sizeof(ui));
     memset(&prev, 0, sizeof(prev));
     memset(&ws, 0, sizeof(ws));
+    counts[0] = counts[1] = counts[2] = counts[3] = 0;
 
     /* Fixed thumbnail pool: newest TC_UI_LOG_MAX drawings, nothing else kept.
      * Bounded by construction, so a busy room cannot grow our footprint. */
@@ -114,10 +130,8 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
         connected = 1;
         snprintf(m, sizeof(m), "{\"t\":\"identify\",\"nick\":\"%s\",\"color\":\"#2fa89a\"}", nickbuf);
         tc_ws_send_text(&ws, m, strlen(m));
-        snprintf(m, sizeof(m), "{\"t\":\"join\",\"room\":\"%s\"}", room);
-        tc_ws_send_text(&ws, m, strlen(m));
-        ui.room = room[0];
-        room_idx = (room[0] >= 'A' && room[0] <= 'D') ? room[0] - 'A' : 0;
+        /* No auto-join: the lobby picks the room. `room` is only the default
+         * highlighted choice. */
         strncpy(status, hint, sizeof(status) - 1);
         status[sizeof(status) - 1] = '\0';
     }
@@ -135,8 +149,11 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
                 const char *s = (const char *)ws.msg;
                 const char *users;
                 if (strstr(s, "\"t\":\"hello\"")) {
-                    int m = tc_json_top_int(s, "max", 0);
-                    if (m > 0) ui.max = m;
+                    int mx = tc_json_top_int(s, "max", 0);
+                    if (mx > 0) ui.max = mx;
+                    parse_counts(s, counts);
+                } else if (strstr(s, "\"t\":\"counts\"")) {
+                    parse_counts(s, counts);
                 } else if (strstr(s, "\"t\":\"joined\"")) {
                     strcpy(status, "JOINED");
                     users = tc_json_top(s, "users");
@@ -182,6 +199,37 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
             }
         }
         if (p.down || prev.down) redraw = TC_BUFFERS;
+        if (in_lobby) {
+            if (p.down && !prev.down) {
+                int pick = tc_lobby_room_at(W, H, p.x, p.y, counts, ui.max);
+                if (pick >= 0 && connected) {
+                    char jm[64];
+                    ui.room = (char)('A' + pick);
+                    ui.nlog = 0; ui.scroll = 0; ui.people = 0;
+                    snprintf(jm, sizeof(jm), "{\"t\":\"join\",\"room\":\"%c\"}", ui.room);
+                    tc_ws_send_text(&ws, jm, strlen(jm));
+                    strncpy(status, hint, sizeof(status) - 1);
+                    status[sizeof(status) - 1] = '\0';
+                    in_lobby = 0;
+                    tc_canvas_clear(&canvas);
+                }
+            }
+            prev = p;
+            if (redraw <= 0) { tc_video_wait(); continue; }
+            redraw--;
+            if (dual) {
+                tc_lobby_render(screen, W, H, counts, ui.max, nickbuf, connected);
+                tc_lobby_render_top(screen_top, topw, toph, counts, ui.max);
+                tc_video_blit(TC_SCREEN_TOP, screen_top, topw, toph);
+                tc_video_blit(TC_SCREEN_BOTTOM, screen, W, H);
+            } else {
+                tc_lobby_render(screen, W, H, counts, ui.max, nickbuf, connected);
+                tc_video_blit(TC_SCREEN_TOP, screen, W, H);
+            }
+            tc_video_present();
+            continue;
+        }
+
         if (p.down && !prev.down) {
             if (hit(cv, p.x, p.y)) {
                 tc_canvas_begin(&canvas, p.x - cv.x, p.y - cv.y,
@@ -193,13 +241,13 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
                 for (i = 0; i < 6; i++)
                     if (hit(tc_ui_pen_rect(W, H, i), p.x, p.y)) ui.pen_index = i;
                 if (hit(tc_ui_room_rect(W, H), p.x, p.y) && connected) {
-                    char jm[64];
-                    room_idx = (room_idx + 1) & 3;
-                    ui.room = (char)('A' + room_idx);
-                    ui.nlog = 0; ui.scroll = 0; ui.people = 0;
-                    snprintf(jm, sizeof(jm), "{\"t\":\"join\",\"room\":\"%c\"}", ui.room);
-                    tc_ws_send_text(&ws, jm, strlen(jm));
-                    strcpy(status, "SWITCHING ROOM");
+                    /* back to the picker rather than cycling blind - you can
+                     * see who is where before committing */
+                    const char *lv = "{\"t\":\"leave\"}";
+                    tc_ws_send_text(&ws, lv, strlen(lv));
+                    ui.room = '-'; ui.nlog = 0; ui.scroll = 0; ui.people = 0;
+                    in_lobby = 1;
+                    strcpy(status, "PICK A ROOM");
                 }
                 if (hit(tc_ui_button_rect(W, H, 0), p.x, p.y)) tc_canvas_undo(&canvas);
                 if (hit(tc_ui_button_rect(W, H, 1), p.x, p.y)) tc_canvas_clear(&canvas);

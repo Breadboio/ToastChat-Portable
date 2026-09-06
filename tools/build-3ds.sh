@@ -21,7 +21,7 @@ if [ "$TLS" = "1" ]; then
 fi
 mkdir -p build/3ds
 for f in core/tc_sha1.c core/tc_base64.c core/tc_ws.c core/tc_draw.c core/tc_ui.c \
-         core/tc_png.c core/tc_send.c core/tc_app.c core/tc_tls.c core/tc_json.c core/tc_imgdec.c core/tc_recv.c core/tc_keyboard.c \
+         core/tc_png.c core/tc_send.c core/tc_app.c core/tc_tls.c core/tc_json.c core/tc_imgdec.c core/tc_recv.c core/tc_keyboard.c core/tc_lobby.c \
          platform/3ds/plat_3ds.c platform/3ds/main.c; do
   $CC $CFLAGS -c "$f" -o "build/3ds/$(basename $f .c).o"
 done
