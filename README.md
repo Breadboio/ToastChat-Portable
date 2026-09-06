@@ -9,17 +9,28 @@ server's real wire protocol, documented and verified in `docs/PROTOCOL.md`.
 
 ## Status — 2026-09-06
 
+Switch is target #1 (user has an unpatched Erista — software-only RCM entry).
+
 | Piece | State |
 |---|---|
-| Wire protocol | **verified against a live server** (see docs/PROTOCOL.md) |
-| Project layout + porting contract | written (`platform/platform.h`, `core/tc.h`) |
-| Third-party deps vendored | stb_image, stb_image_write, jsmn — all public domain / MIT, zero external deps |
-| Core implementation | **not written yet** — blocked on a compiler |
-| Any build at all | **blocked**: this box has no gcc/make and no passwordless sudo |
+| Wire protocol | **verified against a live server** (docs/PROTOCOL.md) |
+| SHA-1 / base64 / RFC 6455 client | **written, compiled, unit-tested, live-tested** |
+| POSIX shim + self-test | passes: FIPS SHA-1 vectors, base64, RFC 6455 accept, real handshake+join |
+| Switch `.nro` | **builds** — 233KB valid NRO0, devkitA64 15.2.0 + libnx, zero warnings |
+| Switch video/input | stubs — framebuffer + touch pass not started |
+| Drawing model / PNG / JSON | not written |
+| **Run on real hardware** | **not done — this is the next real milestone** |
 
-Nothing here has been compiled. Not one line. Treat every claim about the C as
-unverified until a build exists — the protocol notes are the only part backed by
-measurement.
+No host toolchain and no sudo needed: both builds run in Docker via
+`devkitpro/devkita64` and `gcc:13`.
+
+    tools/build-posix.sh 127.0.0.1 3401 C   # compile + unit + live test
+    tools/build-switch.sh                   # -> build/ToastChat.nro
+
+The `.nro` **has never been run.** It compiles and the identical core passes
+live protocol tests on x86, which is not the same thing — see
+[[feedback_build_success_is_not_feature_verification]]. Copy it to
+`/switch/` on the SD card and launch from hbmenu to find out.
 
 ## Why WebSocket and not HTTP polling
 
