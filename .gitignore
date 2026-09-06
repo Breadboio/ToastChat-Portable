@@ -1,0 +1,9 @@
+build/
+*.o
+*.elf
+*.3dsx
+*.smdh
+*.cia
+*.dol
+*.rpx
+*.AppImage
