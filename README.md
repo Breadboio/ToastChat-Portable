@@ -14,12 +14,16 @@ Switch is target #1 (user has an unpatched Erista — software-only RCM entry).
 | Piece | State |
 |---|---|
 | Wire protocol | **verified against a live server** (docs/PROTOCOL.md) |
-| SHA-1 / base64 / RFC 6455 client | **written, compiled, unit-tested, live-tested** |
-| POSIX shim + self-test | passes: FIPS SHA-1 vectors, base64, RFC 6455 accept, real handshake+join |
-| Switch `.nro` | **builds** — 233KB valid NRO0, devkitA64 15.2.0 + libnx, zero warnings |
-| Switch video/input | stubs — framebuffer + touch pass not started |
-| Drawing model / PNG / JSON | not written |
-| **Run on real hardware** | **not done — this is the next real milestone** |
+| SHA-1 / base64 / RFC 6455 client | compiled, unit-tested (FIPS + RFC vectors), live handshake |
+| Stroke model + AA rasteriser | **rendered to PNG and visually reviewed** (build/draw_test.png) |
+| 8x16 bitmap font | generated from Lat15-VGA16 by `tools/mkfont.py` |
+| UI compositor | **rendered at 1280x720 and visually reviewed** (build/ui_switch.png) |
+| PNG encode + base64 + send | **end-to-end round trip** against a live server; wire bytes reviewed (build/wire.png) |
+| Switch framebuffer + touchscreen | written against libnx (`framebufferCreate`, `hidGetTouchScreenStates`) |
+| Switch `.nro` | **builds** — 249KB valid NRO0, zero warnings |
+| JSON parsing (jsmn) | not wired — status is substring-matched for now |
+| Receiving/decoding others' drawings | not written (thumbnails render a placeholder) |
+| **Run on real hardware** | **not done — the next milestone** |
 
 No host toolchain and no sudo needed: both builds run in Docker via
 `devkitpro/devkita64` and `gcc:13`.

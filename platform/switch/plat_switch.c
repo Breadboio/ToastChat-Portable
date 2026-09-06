@@ -76,10 +76,59 @@ void tc_log(const char *fmt, ...) {
     consoleUpdate(NULL);
 }
 
-/* Video/input: stubs until the framebuffer pass. */
+/* ---- video: libnx linear framebuffer ---------------------------------
+ * PIXEL_FORMAT_RGBA_8888 packs a u32 as R|G<<8|B<<16|A<<24, which on
+ * little-endian AArch64 is the byte order R,G,B,A - identical to the core's
+ * buffer, so each row is a straight memcpy. */
+static Framebuffer g_fb;
+static int         g_fb_ready = 0;
+static PadState    g_pad;
+static int         g_quit = 0;
+static tc_pointer  g_ptr;
+
+void tc_switch_video_init(void) {
+    framebufferCreate(&g_fb, nwindowGetDefault(), 1280, 720, PIXEL_FORMAT_RGBA_8888, 2);
+    framebufferMakeLinear(&g_fb);
+    g_fb_ready = 1;
+}
+void tc_switch_video_exit(void) {
+    if (g_fb_ready) { framebufferClose(&g_fb); g_fb_ready = 0; }
+}
+
 void tc_video_size(tc_screen w, int *ow, int *oh) { (void)w; *ow = 1280; *oh = 720; }
-void tc_video_blit(tc_screen w, const uint8_t *rgba, int iw, int ih) { (void)w; (void)rgba; (void)iw; (void)ih; }
-void tc_video_present(void) {}
-void tc_input_poll(void) {}
-void tc_input_pointer(tc_pointer *o) { o->x = o->y = o->down = 0; }
-int  tc_input_quit(void) { return 0; }
+
+void tc_video_blit(tc_screen which, const uint8_t *rgba, int iw, int ih) {
+    u32 stride; u8 *fbp; int y, rowbytes;
+    (void)which;
+    if (!g_fb_ready) return;
+    fbp = (u8 *)framebufferBegin(&g_fb, &stride);
+    rowbytes = (iw < 1280 ? iw : 1280) * 4;
+    for (y = 0; y < ih && y < 720; y++)
+        memcpy(fbp + (size_t)y * stride, rgba + (size_t)y * iw * 4, (size_t)rowbytes);
+    framebufferEnd(&g_fb);
+}
+void tc_video_present(void) { /* framebufferEnd already flipped */ }
+
+/* ---- input: touchscreen (handheld) + buttons ------------------------- */
+void tc_switch_input_init(void) {
+    padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+    padInitializeDefault(&g_pad);
+    hidInitializeTouchScreen();
+    memset(&g_ptr, 0, sizeof(g_ptr));
+}
+
+void tc_input_poll(void) {
+    HidTouchScreenState st;
+    memset(&st, 0, sizeof(st));
+    padUpdate(&g_pad);
+    if (padGetButtonsDown(&g_pad) & HidNpadButton_Plus) g_quit = 1;
+    if (hidGetTouchScreenStates(&st, 1) && st.count > 0) {
+        g_ptr.x = (int)st.touches[0].x;
+        g_ptr.y = (int)st.touches[0].y;
+        g_ptr.down = 1;
+    } else {
+        g_ptr.down = 0;   /* x/y kept, so a release still knows where it was */
+    }
+}
+void tc_input_pointer(tc_pointer *o) { *o = g_ptr; }
+int  tc_input_quit(void) { return g_quit; }
