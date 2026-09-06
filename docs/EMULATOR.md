@@ -44,10 +44,10 @@ a swatch or pen size to change them, and UN / CL / GO are undo / clear / send.
 
 ## Pointing it somewhere else
 
-The server address is compiled in, defaulting to 192.168.1.167:3401 (the dev
-instance, NOT prod on :3400):
+The server address is compiled in, defaulting to the public server
+(breadtoasting.com). To target your own:
 
-    TC_HOST=192.168.1.50 TC_PORT=3401 ./tools/build-3ds.sh
+    TC_HOST=your.server TC_PORT=3401 ./tools/build-3ds.sh
 
 ## What this does and does not prove
 

@@ -3,6 +3,7 @@
 #include "tc_ui.h"
 #include "tc_draw.h"
 #include "tc_send.h"
+#include "tc_json.h"
 #include "../platform/platform.h"
 #include <string.h>
 #include <stdio.h>
@@ -71,9 +72,22 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
             if (r < 0) { connected = 0; ui.connected = 0; strcpy(status, "DISCONNECTED"); }
             else if (r == 1) {
                 const char *s = (const char *)ws.msg;
-                if (strstr(s, "\"t\":\"joined\""))     strcpy(status, "JOINED");
-                else if (strstr(s, "\"t\":\"entry\"")) strcpy(status, "NEW DRAWING");
-                else if (strstr(s, "\"t\":\"error\"")) strcpy(status, "SERVER SAID NO");
+                const char *users;
+                if (strstr(s, "\"t\":\"hello\"")) {
+                    int m = tc_json_top_int(s, "max", 0);
+                    if (m > 0) ui.max = m;
+                } else if (strstr(s, "\"t\":\"joined\"")) {
+                    strcpy(status, "JOINED");
+                    users = tc_json_top(s, "users");
+                    if (users) { int n = tc_json_array_len(users); if (n >= 0) ui.people = n; }
+                } else if (strstr(s, "\"t\":\"roster\"")) {
+                    users = tc_json_top(s, "users");
+                    if (users) { int n = tc_json_array_len(users); if (n >= 0) ui.people = n; }
+                } else if (strstr(s, "\"t\":\"entry\"")) {
+                    strcpy(status, "NEW DRAWING");
+                } else if (strstr(s, "\"t\":\"error\"")) {
+                    strcpy(status, "SERVER SAID NO");
+                }
                 ws.msg_len = 0;
             }
         }

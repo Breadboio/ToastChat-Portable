@@ -106,4 +106,5 @@ runs on **:3401** from the same image, with ingest enabled:
       -e INGEST_TOKEN=devtoken -e MESSAGE_TTL_MIN=600 \
       --memory 192m toastchat-app:latest
 
-Point ports at `192.168.1.167:3401`.
+Point ports at that dev instance with `TC_HOST=<your-host> TC_PORT=3401`.
+The committed defaults target the public server, not a LAN address.

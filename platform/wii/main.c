@@ -5,10 +5,10 @@
 #include "../platform.h"
 
 #ifndef TC_HOST
-#define TC_HOST "192.168.1.167"
+#define TC_HOST "breadtoasting.com"
 #endif
 #ifndef TC_PORT
-#define TC_PORT 3401
+#define TC_PORT 80
 #endif
 #ifndef TC_ROOM
 #define TC_ROOM "C"

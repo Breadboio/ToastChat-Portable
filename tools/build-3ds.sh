@@ -2,9 +2,9 @@
 # Builds ToastChat.3dsx with devkitARM in Docker.
 set -e
 cd "$(dirname "$0")/.."
-HOST="${TC_HOST:-192.168.1.167}"
-PORT="${TC_PORT:-3401}"
-TLS="${TC_TLS:-0}"   # 1 = wss:// via bundled mbedtls
+HOST="${TC_HOST:-breadtoasting.com}"
+PORT="${TC_PORT:-443}"
+TLS="${TC_TLS:-1}"   # 1 = wss:// via bundled mbedtls
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/src -w /src -e HOST="$HOST" -e PORT="$PORT" -e TLS="$TLS" \
   devkitpro/devkitarm:latest sh -c '
 set -e
@@ -19,7 +19,7 @@ if [ "$TLS" = "1" ]; then
 fi
 mkdir -p build/3ds
 for f in core/tc_sha1.c core/tc_base64.c core/tc_ws.c core/tc_draw.c core/tc_ui.c \
-         core/tc_png.c core/tc_send.c core/tc_app.c core/tc_tls.c \
+         core/tc_png.c core/tc_send.c core/tc_app.c core/tc_tls.c core/tc_json.c \
          platform/3ds/plat_3ds.c platform/3ds/main.c; do
   $CC $CFLAGS -c "$f" -o "build/3ds/$(basename $f .c).o"
 done

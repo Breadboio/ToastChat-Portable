@@ -35,7 +35,7 @@ the RFC 6455 §1.3 vector (`dGhlIHNhbXBsZSBub25jZQ==` →
 Request that works, byte for byte:
 
     GET /ws HTTP/1.1\r\n
-    Host: 192.168.1.167:3401\r\n
+    Host: your.server:3401\r\n
     Upgrade: websocket\r\n
     Connection: Upgrade\r\n
     Sec-WebSocket-Key: <base64 of 16 random bytes>\r\n
