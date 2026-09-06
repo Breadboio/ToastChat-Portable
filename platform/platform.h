@@ -38,6 +38,10 @@ typedef enum { TC_SCREEN_TOP = 0, TC_SCREEN_BOTTOM = 1 } tc_screen;
 void tc_video_size(tc_screen which, int *w, int *h);
 void tc_video_blit(tc_screen which, const uint8_t *rgba, int w, int h);
 void tc_video_present(void);
+/* Wait one frame WITHOUT presenting. Required: on a double-buffered console,
+ * presenting without having drawn flips to a stale back buffer, which reads as
+ * flicker. Anything that skips drawing must call this instead of present. */
+void tc_video_wait(void);
 
 /* ---- 3. pointer ---------------------------------------------------------
  * One pointer, because that is what PictoChat needs. 3DS/Wii U touchscreen,
@@ -50,6 +54,11 @@ typedef struct { int x, y, down; } tc_pointer;
 void tc_input_poll(void);
 void tc_input_pointer(tc_pointer *out);
 int  tc_input_quit(void);     /* HOME/START/window-close: 1 = user wants out */
+
+/* Log scrolling: -1 up (older), +1 down (newer), 0 idle. Held, not edge - the
+ * app throttles the repeat rate. The log lives on the 3DS's top screen, which
+ * has no touchscreen, so this cannot be an on-screen control. */
+int  tc_input_scroll(void);
 
 /* ---- 4. time ------------------------------------------------------------ */
 uint32_t tc_millis(void);

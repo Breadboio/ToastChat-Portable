@@ -109,6 +109,7 @@ void tc_video_blit(tc_screen which, const uint8_t *rgba, int iw, int ih) {
     framebufferEnd(&g_fb);
 }
 void tc_video_present(void) { /* framebufferEnd already flipped */ }
+void tc_video_wait(void) { svcSleepThread(16000000ULL); }
 
 /* ---- input: touchscreen (handheld) + buttons ------------------------- */
 void tc_switch_input_init(void) {
@@ -134,3 +135,9 @@ void tc_input_poll(void) {
 }
 void tc_input_pointer(tc_pointer *o) { *o = g_ptr; }
 int  tc_input_quit(void) { return g_quit; }
+int  tc_input_scroll(void) {
+    u64 h = padGetButtons(&g_pad);
+    if (h & (HidNpadButton_Up   | HidNpadButton_StickLUp))   return -1;
+    if (h & (HidNpadButton_Down | HidNpadButton_StickLDown)) return  1;
+    return 0;
+}

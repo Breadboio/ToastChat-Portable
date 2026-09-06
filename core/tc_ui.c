@@ -172,6 +172,22 @@ tc_rect tc_ui_pen_rect(int W, int H, int i) {
     r.x = L.pen_x + i * L.pen_pitch; r.y = L.pen_y;
     return r;
 }
+tc_rect tc_ui_room_rect(int W, int H) {
+    tc_layout L = tc_ui_layout(W, H);
+    tc_rect r;
+    if (L.dual) {
+        r.x = L.pen_x + 6 * L.pen_pitch + 6; r.y = L.pen_y;
+        r.w = W - r.x - 6; r.h = 14;
+    } else if (L.compact) {
+        r.x = L.pen_x + 6 * L.pen_pitch + 10; r.y = L.pen_y;
+        r.w = 66; r.h = 28;
+    } else {
+        r.x = L.pen_x + 6 * L.pen_pitch + 20; r.y = L.pen_y;
+        r.w = 96; r.h = 40;
+    }
+    return r;
+}
+
 tc_rect tc_ui_button_rect(int W, int H, int i) {
     tc_layout L = tc_ui_layout(W, H);
     tc_rect r;
@@ -182,6 +198,21 @@ tc_rect tc_ui_button_rect(int W, int H, int i) {
 
 /* One log row, PictoChat-style: a coloured name chip, the drawing beside it,
  * a dashed rule underneath. System lines get the pale notice treatment. */
+#define TC_ROW_MSG(L) ((L).compact ? ((L).dual ? 62 : 64) : 112)
+#define TC_ROW_SYS(L) ((L).compact ? 18 : 24)
+
+int tc_ui_visible_rows(const tc_ui *ui, int W, int H) {
+    tc_layout L = tc_ui_layout(W, H);
+    int used = 0, n = 0, i;
+    for (i = ui->scroll; i < ui->nlog && i < TC_UI_LOG_MAX; i++) {
+        int rh = ui->log[i].is_sys ? TC_ROW_SYS(L) : TC_ROW_MSG(L);
+        if (used + rh > L.log_h) break;
+        used += rh;
+        n++;
+    }
+    return n;
+}
+
 static void draw_row(uint8_t *b, int W, int H, const tc_ui_entry *e,
                      int x, int y, int w, int h, int compact) {
     int chip_w = 88;   /* 10 chars at 8px + padding: the server nick limit */
@@ -279,11 +310,11 @@ static void render_bar_and_log(const tc_ui *ui, uint8_t *rgba, int W, int H,
     top = L.bar_h;
     bottom = L.bar_h + L.log_h;
     fill(rgba, W, H, 0, top, W, L.log_h, PC_PAGE);
-    msg_h = L.compact ? (L.dual ? 62 : 64) : 112;
-    sys_h = L.compact ? 18 : 24;
+    msg_h = TC_ROW_MSG(L);
+    sys_h = TC_ROW_SYS(L);
 
     y = bottom;
-    for (i = 0; i < ui->nlog && i < TC_UI_LOG_MAX; i++) {
+    for (i = ui->scroll; i < ui->nlog && i < TC_UI_LOG_MAX; i++) {
         int rh = ui->log[i].is_sys ? sys_h : msg_h;
         y -= rh;
         if (y < top) break;
@@ -291,6 +322,21 @@ static void render_bar_and_log(const tc_ui *ui, uint8_t *rgba, int W, int H,
     }
     if (ui->nlog == 0)
         text(rgba, W, H, pad, top + L.log_h / 2 - 8, "NOTHING DRAWN YET", PC_INK_FAINT, 1);
+
+    /* Scrollbar: only when there is more than fits, so it does not nag. */
+    {
+        int shown = tc_ui_visible_rows(ui, W, H);
+        if (ui->nlog > shown && shown > 0) {
+            int track_h = L.log_h - 8;
+            int bar_h = track_h * shown / ui->nlog;
+            int maxs = ui->nlog - shown;
+            int off = maxs > 0 ? (track_h - bar_h) * (maxs - ui->scroll) / maxs : 0;
+            if (bar_h < 10) bar_h = 10;
+            /* The bar alone says it; a text hint here overlapped the top row. */
+            fill(rgba, W, H, W - 5, top + 4, 3, track_h, PC_PANEL);
+            round_rect(rgba, W, H, W - 6, top + 4 + off, 5, bar_h, 2, PC_INK_FAINT);
+        }
+    }
     fill(rgba, W, H, 0, bottom - 1, W, 1, PC_LINE);
 }
 
@@ -336,6 +382,19 @@ static void render_canvas_and_tools(const tc_ui *ui, uint8_t *rgba, int W, int H
             for (dx = -rad; dx <= rad; dx++)
                 if (dx * dx + dy * dy <= rad * rad) px_set(rgba, W, H, cx + dx, cy + dy, PC_INK);
         if (rad == 0) px_set(rgba, W, H, cx, cy, PC_INK);
+    }
+    {
+        tc_rect r = tc_ui_room_rect(W, H);
+        char lab[8];
+        int lw;
+        lab[0] = 'R'; lab[1] = 'M'; lab[2] = ' ';
+        lab[3] = (ui->room >= 'A' && ui->room <= 'D') ? ui->room : '-';
+        lab[4] = '\0';
+        if (L.dual) { lab[0] = lab[3]; lab[1] = '\0'; }
+        lw = (int)strlen(lab) * 8;
+        round_rect(rgba, W, H, r.x, r.y, r.w, r.h, 3, PC_PAGE);
+        frame(rgba, W, H, r.x, r.y, r.w, r.h, PC_LINE);
+        text(rgba, W, H, r.x + (r.w - lw) / 2, r.y + (r.h - 16) / 2, lab, PC_ACCENT, 1);
     }
     {
         static const char *Lb[3] = { "UNDO", "CLEAR", "SEND" };

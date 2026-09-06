@@ -65,6 +65,9 @@ int tc_sock_recv(tc_sock *s, void *b, size_t n) {
 
 void tc_sock_close(tc_sock *s) { if (s) { close(s->fd); free(s); } }
 
+void tc_video_wait(void) { tc_sleep_ms(16); }
+int  tc_input_scroll(void) { return 0; }
+
 uint32_t tc_millis(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);

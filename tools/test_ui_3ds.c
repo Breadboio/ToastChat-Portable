@@ -41,14 +41,23 @@ int main(void) {
         memset(thumb, 0, sizeof(thumb));
         tc_canvas_render(&t, thumb, 100, 58);
         /* newest first, as tc_recv builds it */
-        strcpy(ui.log[0].nick, "Breadboi");
-        ui.log[0].w = 100; ui.log[0].h = 58; ui.log[0].stride = 100;
-        ui.log[0].rgba = thumb; ui.log[0].color = TC_PALETTE[8];
-        ui.log[1].is_sys = 1; strcpy(ui.log[1].text, "Wii entered Room C.");
-        strcpy(ui.log[2].nick, "Wii");
-        ui.log[2].w = 100; ui.log[2].h = 58; ui.log[2].stride = 100;
-        ui.log[2].rgba = thumb; ui.log[2].color = TC_PALETTE[2];
-        ui.nlog = 3;
+        {   /* a full scrollback so the scrollbar has something to say */
+            static const char *names[] = { "Breadboi", "Wii", "Switch", "Hannah", "3DS" };
+            int n;
+            for (n = 0; n < 9; n++) {
+                if (n % 3 == 1) {
+                    ui.log[n].is_sys = 1;
+                    strcpy(ui.log[n].text, "someone entered Room C.");
+                } else {
+                    strcpy(ui.log[n].nick, names[n % 5]);
+                    ui.log[n].w = 100; ui.log[n].h = 58; ui.log[n].stride = 100;
+                    ui.log[n].rgba = thumb;
+                    ui.log[n].color = TC_PALETTE[(n * 3) % 16];
+                }
+            }
+            ui.nlog = 9;
+            ui.scroll = 2;      /* scrolled back a couple of rows */
+        }
         tc_canvas_free(&t);
     }
     ui.connected = 1; ui.room = 'C'; ui.people = 3; ui.max = 16;

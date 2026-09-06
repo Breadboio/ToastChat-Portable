@@ -120,6 +120,7 @@ void tc_video_present(void) {
     gfxSwapBuffers();
     gspWaitForVBlank();
 }
+void tc_video_wait(void) { gspWaitForVBlank(); }   /* no swap: see platform.h */
 
 /* ---- input: touchscreen (bottom screen) ------------------------------- */
 void tc_input_poll(void) {
@@ -138,6 +139,12 @@ void tc_input_poll(void) {
 }
 void tc_input_pointer(tc_pointer *o) { *o = g_ptr; }
 int  tc_input_quit(void) { return g_quit; }
+int  tc_input_scroll(void) {
+    u32 h = hidKeysHeld();
+    if (h & (KEY_DUP | KEY_L))   return -1;
+    if (h & (KEY_DDOWN | KEY_R)) return  1;
+    return 0;
+}
 
 /* ---- time / memory / log ---------------------------------------------- */
 uint32_t tc_millis(void)          { return (uint32_t)(svcGetSystemTick() / 268123); }

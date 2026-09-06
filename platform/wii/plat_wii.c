@@ -129,6 +129,7 @@ void tc_video_blit(tc_screen which, const uint8_t *rgba, int iw, int ih) {
     }
 }
 void tc_video_present(void) { VIDEO_Flush(); VIDEO_WaitVSync(); }
+void tc_video_wait(void) { VIDEO_WaitVSync(); }
 
 /* ---- input: Wiimote IR ------------------------------------------------ */
 static tc_pointer g_ptr;
@@ -155,6 +156,12 @@ void tc_input_poll(void) {
 }
 void tc_input_pointer(tc_pointer *o) { *o = g_ptr; }
 int  tc_input_quit(void) { return g_quit; }
+int  tc_input_scroll(void) {
+    u32 h = WPAD_ButtonsHeld(WPAD_CHAN_0);
+    if (h & WPAD_BUTTON_UP)   return -1;
+    if (h & WPAD_BUTTON_DOWN) return  1;
+    return 0;
+}
 
 /* ---- time / memory / log ---------------------------------------------- */
 uint32_t tc_millis(void)          { return (uint32_t)ticks_to_millisecs(gettime()); }

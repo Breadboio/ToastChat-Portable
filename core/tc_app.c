@@ -31,6 +31,8 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
     tc_rect cv;
     tc_pointer p, prev;
     int connected = 0, drawing = 0, dirty = 1;
+    int room_idx = 0;
+    uint32_t last_scroll = 0;
     char status[48];
     char m[160];
     char nickbuf[TC_NICK_LIMIT + 1];
@@ -107,6 +109,7 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
         snprintf(m, sizeof(m), "{\"t\":\"join\",\"room\":\"%s\"}", room);
         tc_ws_send_text(&ws, m, strlen(m));
         ui.room = room[0];
+        room_idx = (room[0] >= 'A' && room[0] <= 'D') ? room[0] - 'A' : 0;
         strncpy(status, hint, sizeof(status) - 1);
         status[sizeof(status) - 1] = '\0';
     }
@@ -133,6 +136,7 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
                     /* Replay the room's backlog oldest-first so the newest
                      * ends up at the front of the list. */
                     tc_recv_replay(&ui, thumbs, s);
+                    ui.scroll = 0;
                 } else if (strstr(s, "\"t\":\"wiped\"")) {
                     ui.nlog = 0;
                 } else if (strstr(s, "\"t\":\"roster\"")) {
@@ -140,8 +144,13 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
                     if (users) { int n = tc_json_array_len(users); if (n >= 0) ui.people = n; }
                 } else if (strstr(s, "\"t\":\"entry\"")) {
                     const char *obj = tc_json_top(s, "entry");
-                    if (obj) tc_recv_push(&ui, thumbs, obj);
-                    strcpy(status, "NEW DRAWING");
+                    if (obj) {
+                        tc_recv_push(&ui, thumbs, obj);
+                        /* If the reader has scrolled back, hold their place
+                         * rather than yanking the view to the newest row. */
+                        if (ui.scroll > 0 && ui.scroll < TC_UI_LOG_MAX - 1) ui.scroll++;
+                        else strcpy(status, "NEW DRAWING");
+                    }
                 } else if (strstr(s, "\"t\":\"error\"")) {
                     strcpy(status, "SERVER SAID NO");
                 }
@@ -150,6 +159,20 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
             }
         }
 
+        {
+            int sc = tc_input_scroll();
+            uint32_t now = tc_millis();
+            if (sc && now - last_scroll > 110) {
+                int shown = tc_ui_visible_rows(&ui, W, H);
+                int maxs = ui.nlog - shown;
+                int want = ui.scroll + (sc < 0 ? 1 : -1);   /* up = older */
+                if (maxs < 0) maxs = 0;
+                if (want < 0) want = 0;
+                if (want > maxs) want = maxs;
+                if (want != ui.scroll) { ui.scroll = want; dirty = 1; }
+                last_scroll = now;
+            }
+        }
         if (p.down || prev.down) dirty = 1;
         if (p.down && !prev.down) {
             if (hit(cv, p.x, p.y)) {
@@ -161,6 +184,15 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
                     if (hit(tc_ui_swatch_rect(W, H, i), p.x, p.y)) ui.pal_index = i;
                 for (i = 0; i < 6; i++)
                     if (hit(tc_ui_pen_rect(W, H, i), p.x, p.y)) ui.pen_index = i;
+                if (hit(tc_ui_room_rect(W, H), p.x, p.y) && connected) {
+                    char jm[64];
+                    room_idx = (room_idx + 1) & 3;
+                    ui.room = (char)('A' + room_idx);
+                    ui.nlog = 0; ui.scroll = 0; ui.people = 0;
+                    snprintf(jm, sizeof(jm), "{\"t\":\"join\",\"room\":\"%c\"}", ui.room);
+                    tc_ws_send_text(&ws, jm, strlen(jm));
+                    strcpy(status, "SWITCHING ROOM");
+                }
                 if (hit(tc_ui_button_rect(W, H, 0), p.x, p.y)) tc_canvas_undo(&canvas);
                 if (hit(tc_ui_button_rect(W, H, 1), p.x, p.y)) tc_canvas_clear(&canvas);
                 if (hit(tc_ui_button_rect(W, H, 2), p.x, p.y)) {
@@ -186,7 +218,8 @@ int tc_app_run(int W, int H, const char *host, int port, int use_tls,
 
         /* The screen is static most frames - drawing every one costs about two
          * thirds of the frame rate on a 3DS for no visible benefit. */
-        if (!dirty) { tc_video_present(); continue; }
+        if (!dirty) { tc_video_wait(); continue; }   /* wait, do NOT present:
+                                                       * see platform.h */
         dirty = 0;
 
         if (dual) {
