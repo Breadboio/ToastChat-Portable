@@ -120,6 +120,7 @@ void tc_switch_input_init(void) {
 void tc_input_poll(void) {
     HidTouchScreenState st;
     memset(&st, 0, sizeof(st));
+    if (!appletMainLoop()) g_quit = 1;   /* HOME / sleep / eject */
     padUpdate(&g_pad);
     if (padGetButtonsDown(&g_pad) & HidNpadButton_Plus) g_quit = 1;
     if (hidGetTouchScreenStates(&st, 1) && st.count > 0) {

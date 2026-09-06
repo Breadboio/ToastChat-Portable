@@ -9,11 +9,22 @@
 #include <string.h>
 #include <math.h>
 
-#define W 1280
-#define H 720
+static int W = 1280, H = 720;
 
-int main(void) {
+static void render_one(const char *out, int w, int h);
+
+int main(int argc, char **argv) {
+    (void)argc; (void)argv;
+    render_one("/src/build/ui_switch.png", 1280, 720);
+    render_one("/src/build/ui_wii.png", 640, 480);
+    return 0;
+}
+
+static void render_one(const char *out, int w, int h) {
+    W = w; H = h;
+    {
     uint8_t *buf = (uint8_t *)calloc((size_t)W * H * 4, 1);
+    (void)0;
     tc_canvas cv;
     tc_ui ui;
     tc_rect cr;
@@ -24,17 +35,21 @@ int main(void) {
     cr = tc_ui_canvas_rect(W, H);
 
     /* Something drawn on the canvas, in canvas-local coordinates. */
-    tc_canvas_begin(&cv, 120, 90, TC_PALETTE[8], 3.0f);
-    for (i = 0; i <= 300; i++)
-        tc_canvas_to(&cv, 120 + i * 3, (int)(150 + 70 * sin(i * 0.04)));
-    tc_canvas_end(&cv);
-    tc_canvas_begin(&cv, 1060, 70, TC_PALETTE[2], 8.0f);
-    tc_canvas_to(&cv, 1160, 200);
-    tc_canvas_end(&cv);
-    tc_canvas_begin(&cv, 1160, 70, TC_PALETTE[2], 8.0f);
-    tc_canvas_to(&cv, 1060, 200);
-    tc_canvas_end(&cv);
-    for (i = 0; i < 5; i++) { tc_canvas_begin(&cv, 900 + i * 26, 250, TC_PALETTE[11], 2.0f); tc_canvas_end(&cv); }
+    {
+        float sx = cr.w / 1280.0f, sy = cr.h / 436.0f;
+        tc_canvas_begin(&cv, (int)(120*sx), (int)(90*sy), TC_PALETTE[8], 3.0f);
+        for (i = 0; i <= 300; i++)
+            tc_canvas_to(&cv, (int)((120 + i * 3)*sx), (int)((150 + 70 * sin(i * 0.04))*sy));
+        tc_canvas_end(&cv);
+        tc_canvas_begin(&cv, (int)(1060*sx), (int)(70*sy), TC_PALETTE[2], 8.0f);
+        tc_canvas_to(&cv, (int)(1160*sx), (int)(200*sy)); tc_canvas_end(&cv);
+        tc_canvas_begin(&cv, (int)(1160*sx), (int)(70*sy), TC_PALETTE[2], 8.0f);
+        tc_canvas_to(&cv, (int)(1060*sx), (int)(200*sy)); tc_canvas_end(&cv);
+        for (i = 0; i < 5; i++) {
+            tc_canvas_begin(&cv, (int)((900 + i * 26)*sx), (int)(250*sy), TC_PALETTE[11], 2.0f);
+            tc_canvas_end(&cv);
+        }
+    }
 
     /* A couple of thumbnails: one real, one still loading. */
     {
@@ -64,11 +79,10 @@ int main(void) {
         for (k = 0; k < (long)W * H; k++) {
             flat[k*3+0] = buf[k*4+0]; flat[k*3+1] = buf[k*4+1]; flat[k*3+2] = buf[k*4+2];
         }
-        stbi_write_png("/src/build/ui_switch.png", W, H, 3, flat, W * 3);
+        stbi_write_png(out, W, H, 3, flat, W * 3);
         free(flat);
     }
-    printf("canvas region: x=%d y=%d w=%d h=%d\n", cr.x, cr.y, cr.w, cr.h);
-    puts("wrote build/ui_switch.png");
+    printf("%s  %dx%d  canvas %dx%d at y=%d\n", out, W, H, cr.w, cr.h, cr.y);
     tc_canvas_free(&cv); free(buf);
-    return 0;
+    }
 }

@@ -13,17 +13,15 @@ Switch is target #1 (user has an unpatched Erista — software-only RCM entry).
 
 | Piece | State |
 |---|---|
-| Wire protocol | **verified against a live server** (docs/PROTOCOL.md) |
-| SHA-1 / base64 / RFC 6455 client | compiled, unit-tested (FIPS + RFC vectors), live handshake |
-| Stroke model + AA rasteriser | **rendered to PNG and visually reviewed** (build/draw_test.png) |
-| 8x16 bitmap font | generated from Lat15-VGA16 by `tools/mkfont.py` |
-| UI compositor | **rendered at 1280x720 and visually reviewed** (build/ui_switch.png) |
-| PNG encode + base64 + send | **end-to-end round trip** against a live server; wire bytes reviewed (build/wire.png) |
-| Switch framebuffer + touchscreen | written against libnx (`framebufferCreate`, `hidGetTouchScreenStates`) |
-| Switch `.nro` | **builds** — 249KB valid NRO0, zero warnings |
-| JSON parsing (jsmn) | not wired — status is substring-matched for now |
-| Receiving/decoding others' drawings | not written (thumbnails render a placeholder) |
-| **Run on real hardware** | **not done — the next milestone** |
+| Wire protocol | verified against a live server (docs/PROTOCOL.md) |
+| Core (SHA-1, base64, RFC 6455, rasteriser, PNG, send) | compiled, unit-tested, live round trip |
+| UI compositor | renders at 1280x720, 640x480 and dual 400x240+320x240; all reviewed as PNGs |
+| **Switch** (`.nro`, 254KB) | builds clean; framebuffer + touchscreen written; **never run** |
+| **Wii** (`boot.dol`, 368KB) | builds clean; net_* sockets, YUV 4:2:2 blit (round-trip verified), Wiimote IR; **never run** |
+| **3DS** (`.3dsx`, 164KB) | builds clean; **RUNS IN AZAHAR** - boots, renders both screens, connects, joins a room |
+| JSON parsing (jsmn) | not wired - status is substring-matched, so people-count stays 0 |
+| Receiving others' drawings | not written (thumbnails show a placeholder) |
+| Run on real hardware | **not done on any of the three** |
 
 No host toolchain and no sudo needed: both builds run in Docker via
 `devkitpro/devkita64` and `gcc:13`.

@@ -20,10 +20,6 @@ const float TC_PEN_RADIUS[6] = { 0.5f, 1.0f, 2.0f, 3.0f, 5.0f, 8.0f };
 #define BAD     0xc8352b
 #define PAPER   0xf4f1e8
 
-#define BAR_H   40
-#define LOG_H   160
-#define TOOL_H  84
-
 static void px_set(uint8_t *b, int W, int H, int x, int y, uint32_t c) {
     uint8_t *p;
     if (x < 0 || y < 0 || x >= W || y >= H) return;
@@ -38,7 +34,7 @@ static void frame(uint8_t *b, int W, int H, int x, int y, int w, int h, uint32_t
     fill(b, W, H, x, y, w, 1, c); fill(b, W, H, x, y + h - 1, w, 1, c);
     fill(b, W, H, x, y, 1, h, c); fill(b, W, H, x + w - 1, y, 1, h, c);
 }
-static int text(uint8_t *b, int W, int H, int x, int y, const char *s, uint32_t c, int scale) {
+static void text(uint8_t *b, int W, int H, int x, int y, const char *s, uint32_t c, int scale) {
     int cx = x;
     for (; *s; s++) {
         int ch = (unsigned char)*s, row, col;
@@ -56,31 +52,79 @@ static int text(uint8_t *b, int W, int H, int x, int y, const char *s, uint32_t 
         }
         cx += 8 * scale;
     }
-    return cx - x;
+    return;
+}
+
+tc_layout tc_ui_layout(int W, int H) {
+    tc_layout L;
+    memset(&L, 0, sizeof(L));
+    L.compact = (W < 900);
+    L.dual = (W < 400);
+    if (L.dual) {
+        /* 3DS bottom screen, 320x240: no status bar and no log here - those
+         * live on the top screen - so the whole height is canvas + toolbar. */
+        L.bar_h = 0; L.log_h = 0; L.tool_h = 60;
+        L.sw_size = 16; L.sw_pitch = 18; L.sw_x = 6; L.sw_cols = 8;
+        L.sw_y = H - L.tool_h + 4;
+        L.pen_size = 14; L.pen_pitch = 16; L.pen_x = 158; L.pen_y = L.sw_y;
+        L.btn_w = 48; L.btn_h = 18; L.btn_pitch = 52;
+        L.btn_x = 158; L.btn_y = L.sw_y + 22;
+        L.thumb_w = 100; L.thumb_h = 58; L.thumb_gap = 8;
+    } else if (!L.compact) {
+        L.bar_h = 40; L.log_h = 160; L.tool_h = 84;
+        L.sw_size = 34; L.sw_pitch = 39; L.sw_x = 16; L.sw_cols = 16;
+        L.sw_y = H - L.tool_h + 12;
+        L.pen_size = 34; L.pen_pitch = 39;
+        L.pen_x = L.sw_x + 16 * L.sw_pitch + 25; L.pen_y = L.sw_y;
+        L.btn_w = 110; L.btn_h = 40; L.btn_pitch = 118;
+        L.btn_x = W - 16 - (3 * 110 + 2 * 8); L.btn_y = L.sw_y;
+        L.thumb_w = 180; L.thumb_h = 118; L.thumb_gap = 12;
+    } else {
+        /* 640x480: swatches wrap to two rows of eight and the buttons sit under
+         * the pen row. Sixteen swatches in one row would want 624 of 640px. */
+        L.bar_h = 24; L.log_h = 88; L.tool_h = 96;
+        L.sw_size = 30; L.sw_pitch = 34; L.sw_x = 12; L.sw_cols = 8;
+        L.sw_y = H - L.tool_h + 8;
+        L.pen_size = 28; L.pen_pitch = 32; L.pen_x = 292; L.pen_y = L.sw_y;
+        L.btn_w = 70; L.btn_h = 28; L.btn_pitch = 76;
+        L.btn_x = 292; L.btn_y = L.sw_y + 34;
+        L.thumb_w = 100; L.thumb_h = 58; L.thumb_gap = 10;
+    }
+    return L;
 }
 
 tc_rect tc_ui_canvas_rect(int W, int H) {
-    tc_rect r; r.x = 0; r.y = BAR_H + LOG_H; r.w = W; r.h = H - BAR_H - LOG_H - TOOL_H;
+    tc_layout L = tc_ui_layout(W, H);
+    tc_rect r;
+    r.x = 0; r.y = L.bar_h + L.log_h;
+    r.w = W; r.h = H - L.bar_h - L.log_h - L.tool_h;
     return r;
 }
 tc_rect tc_ui_swatch_rect(int W, int H, int i) {
-    tc_rect r; r.w = 34; r.h = 40;
-    r.x = 16 + i * 39; r.y = H - TOOL_H + 12;
-    (void)W; return r;
+    tc_layout L = tc_ui_layout(W, H);
+    tc_rect r;
+    r.w = L.sw_size; r.h = L.dual ? 16 : (L.compact ? 30 : 40);
+    r.x = L.sw_x + (i % L.sw_cols) * L.sw_pitch;
+    r.y = L.sw_y + (i / L.sw_cols) * L.sw_pitch;
+    return r;
 }
 tc_rect tc_ui_pen_rect(int W, int H, int i) {
-    tc_rect r; r.w = 34; r.h = 40;
-    r.x = 16 + 16 * 39 + 25 + i * 39; r.y = H - TOOL_H + 12;
-    (void)W; return r;
+    tc_layout L = tc_ui_layout(W, H);
+    tc_rect r;
+    r.w = L.pen_size; r.h = L.dual ? 14 : (L.compact ? 28 : 40);
+    r.x = L.pen_x + i * L.pen_pitch; r.y = L.pen_y;
+    return r;
 }
 tc_rect tc_ui_button_rect(int W, int H, int i) {
-    tc_rect r; int bw = 110, gap = 8, total = 3 * bw + 2 * gap;
-    r.w = bw; r.h = 40; r.y = H - TOOL_H + 12;
-    r.x = W - 16 - total + i * (bw + gap);
+    tc_layout L = tc_ui_layout(W, H);
+    tc_rect r;
+    r.w = L.btn_w; r.h = L.btn_h;
+    r.x = L.btn_x + i * L.btn_pitch; r.y = L.btn_y;
     return r;
 }
 
-static void draw_thumb(uint8_t *b, int W, int H, const tc_ui_entry *e, int x, int y, int tw, int th) {
+static void draw_thumb(uint8_t *b, int W, int H, const tc_ui_entry *e,
+                       int x, int y, int tw, int th) {
     int i, j;
     fill(b, W, H, x, y, tw, th, PAPER);
     frame(b, W, H, x, y, tw, th, EDGE);
@@ -98,72 +142,86 @@ static void draw_thumb(uint8_t *b, int W, int H, const tc_ui_entry *e, int x, in
             }
         }
     } else {
-        text(b, W, H, x + tw / 2 - 24, y + th / 2 - 8, "...", DIM, 2);
+        text(b, W, H, x + tw / 2 - 12, y + th / 2 - 8, "...", DIM, 1);
     }
-    text(b, W, H, x + 3, y + th + 4, e->nick, DIM, 1);
+    text(b, W, H, x + 2, y + th + 2, e->nick, DIM, 1);
 }
 
-void tc_ui_render(const tc_ui *ui, uint8_t *rgba, int W, int H) {
-    tc_rect cv = tc_ui_canvas_rect(W, H);
+static void render_bar_and_log(const tc_ui *ui, uint8_t *rgba, int W, int H,
+                               tc_layout L, int pad) {
     char buf[64];
+    int i, ty;
+
+    fill(rgba, W, H, 0, 0, W, L.bar_h, PANEL);
+    fill(rgba, W, H, 0, L.bar_h - 1, W, 1, EDGE);
+    ty = (L.bar_h - 16) / 2;
+    if (ty < 0) ty = 0;
+
+    if (W >= 360) {
+        text(rgba, W, H, pad, ty, "TOASTCHAT", INK, 1);
+        fill(rgba, W, H, pad + 84, ty, 8, 16, ui->connected ? OK : BAD);
+        text(rgba, W, H, pad + 100, ty, ui->connected ? "ONLINE" : "OFFLINE",
+             ui->connected ? OK : BAD, 1);
+    } else {
+        fill(rgba, W, H, pad, ty, 8, 16, ui->connected ? OK : BAD);
+    }
+    {
+        int rx = (W >= 360) ? pad + 200 : pad + 16;
+        if (ui->room >= 'A' && ui->room <= 'D') {
+            int k = 0;
+            memcpy(buf, "ROOM ", 5); buf[5] = ui->room; buf[6] = '\0';
+            text(rgba, W, H, rx, ty, buf, INK, 1);
+            if (ui->people >= 10) buf[k++] = (char)('0' + ui->people / 10);
+            buf[k++] = (char)('0' + ui->people % 10); buf[k++] = '/';
+            if (ui->max >= 10) buf[k++] = (char)('0' + ui->max / 10);
+            buf[k++] = (char)('0' + ui->max % 10); buf[k] = '\0';
+            text(rgba, W, H, rx + 68, ty, buf, DIM, 1);
+        } else {
+            text(rgba, W, H, rx, ty, "LOBBY", DIM, 1);
+        }
+    }
+    if (ui->status) {
+        int sx = W - pad - (int)strlen(ui->status) * 8;
+        if (sx > pad + 300 || W < 360) text(rgba, W, H, sx, ty, ui->status, DIM, 1);
+    }
+
+    {
+        int x = pad, shown = 0;
+        for (i = 0; i < ui->nlog && i < TC_UI_LOG_MAX; i++) {
+            if (x + L.thumb_w > W - pad) break;
+            draw_thumb(rgba, W, H, &ui->log[i], x, L.bar_h + 8, L.thumb_w, L.thumb_h);
+            x += L.thumb_w + L.thumb_gap;
+            shown++;
+        }
+        if (shown == 0)
+            text(rgba, W, H, pad, L.bar_h + L.log_h / 2 - 8, "NOTHING DRAWN YET", DIM, 1);
+    }
+    if (L.log_h > 0) fill(rgba, W, H, 0, L.bar_h + L.log_h - 1, W, 1, EDGE);
+}
+
+static void render_canvas_and_tools(const tc_ui *ui, uint8_t *rgba, int W, int H,
+                                    tc_layout L) {
+    tc_rect cv;
     int i;
 
-    fill(rgba, W, H, 0, 0, W, H, BG);
+    cv.x = 0; cv.y = L.bar_h + L.log_h;
+    cv.w = W; cv.h = H - L.bar_h - L.log_h - L.tool_h;
 
-    /* --- status bar --- */
-    fill(rgba, W, H, 0, 0, W, BAR_H, PANEL);
-    fill(rgba, W, H, 0, BAR_H - 1, W, 1, EDGE);
-    text(rgba, W, H, 16, 12, "TOASTCHAT", INK, 1);
-    fill(rgba, W, H, 108, 12, 8, 16, ui->connected ? OK : BAD);
-    text(rgba, W, H, 124, 12, ui->connected ? "ONLINE" : "OFFLINE",
-         ui->connected ? OK : BAD, 1);
-    if (ui->room >= 'A' && ui->room <= 'D') {
-        buf[0] = 'R'; buf[1] = 'O'; buf[2] = 'O'; buf[3] = 'M'; buf[4] = ' ';
-        buf[5] = ui->room; buf[6] = '\0';
-        text(rgba, W, H, 240, 12, buf, INK, 1);
-        {   /* people/max without stdio */
-            int n = ui->people, m = ui->max, k = 0;
-            if (n >= 10) buf[k++] = (char)('0' + n / 10);
-            buf[k++] = (char)('0' + n % 10); buf[k++] = '/';
-            if (m >= 10) buf[k++] = (char)('0' + m / 10);
-            buf[k++] = (char)('0' + m % 10); buf[k] = '\0';
-            text(rgba, W, H, 330, 12, buf, DIM, 1);
-        }
-    } else {
-        text(rgba, W, H, 240, 12, "LOBBY", DIM, 1);
-    }
-    if (ui->status) text(rgba, W, H, W - 16 - (int)strlen(ui->status) * 8, 12, ui->status, DIM, 1);
-
-    /* --- log strip --- */
-    fill(rgba, W, H, 0, BAR_H, W, LOG_H, BG);
-    {
-        int tw = 180, th = 118, x = 16;
-        for (i = 0; i < ui->nlog && i < TC_UI_LOG_MAX; i++) {
-            draw_thumb(rgba, W, H, &ui->log[i], x, BAR_H + 12, tw, th);
-            x += tw + 12;
-        }
-        if (ui->nlog == 0)
-            text(rgba, W, H, 16, BAR_H + 60, "NOTHING DRAWN YET", DIM, 1);
-    }
-    fill(rgba, W, H, 0, BAR_H + LOG_H - 1, W, 1, EDGE);
-
-    /* --- canvas --- */
     fill(rgba, W, H, cv.x, cv.y, cv.w, cv.h, PAPER);
     if (ui->canvas) {
-        /* strokes are stored in canvas space; blit with the region offset */
         uint8_t *sub = rgba + ((size_t)cv.y * W) * 4;
         tc_canvas_render(ui->canvas, sub, W, cv.h);
     }
 
-    /* --- toolbar --- */
-    fill(rgba, W, H, 0, H - TOOL_H, W, TOOL_H, PANEL);
-    fill(rgba, W, H, 0, H - TOOL_H, W, 1, EDGE);
+    fill(rgba, W, H, 0, H - L.tool_h, W, L.tool_h, PANEL);
+    fill(rgba, W, H, 0, H - L.tool_h, W, 1, EDGE);
     for (i = 0; i < 16; i++) {
         tc_rect r = tc_ui_swatch_rect(W, H, i);
         fill(rgba, W, H, r.x, r.y, r.w, r.h, TC_PALETTE[i]);
         if (i == ui->pal_index) {
-            frame(rgba, W, H, r.x - 3, r.y - 3, r.w + 6, r.h + 6, INK);
-            frame(rgba, W, H, r.x - 2, r.y - 2, r.w + 4, r.h + 4, INK);
+            int g = L.dual ? 1 : 2;
+            frame(rgba, W, H, r.x - g - 1, r.y - g - 1, r.w + 2 * g + 2, r.h + 2 * g + 2, INK);
+            frame(rgba, W, H, r.x - g, r.y - g, r.w + 2 * g, r.h + 2 * g, INK);
         } else {
             frame(rgba, W, H, r.x, r.y, r.w, r.h, EDGE);
         }
@@ -172,6 +230,7 @@ void tc_ui_render(const tc_ui *ui, uint8_t *rgba, int W, int H) {
         tc_rect r = tc_ui_pen_rect(W, H, i);
         int cx = r.x + r.w / 2, cy = r.y + r.h / 2;
         int rad = (int)TC_PEN_RADIUS[i], dx, dy;
+        if (L.dual && rad > 4) rad = 4;
         fill(rgba, W, H, r.x, r.y, r.w, r.h, BG);
         frame(rgba, W, H, r.x, r.y, r.w, r.h, i == ui->pen_index ? INK : EDGE);
         for (dy = -rad; dy <= rad; dy++)
@@ -180,13 +239,36 @@ void tc_ui_render(const tc_ui *ui, uint8_t *rgba, int W, int H) {
         if (rad == 0) px_set(rgba, W, H, cx, cy, INK);
     }
     {
-        static const char *L[3] = { "UNDO", "CLEAR", "SEND" };
+        static const char *Lb[3] = { "UNDO", "CLEAR", "SEND" };
+        static const char *Ls[3] = { "UN", "CL", "GO" };
         for (i = 0; i < 3; i++) {
             tc_rect r = tc_ui_button_rect(W, H, i);
-            uint32_t c = (i == 2) ? OK : EDGE;
-            fill(rgba, W, H, r.x, r.y, r.w, r.h, c);
+            const char *lab = L.dual ? Ls[i] : Lb[i];
+            fill(rgba, W, H, r.x, r.y, r.w, r.h, (i == 2) ? OK : EDGE);
             frame(rgba, W, H, r.x, r.y, r.w, r.h, INK);
-            text(rgba, W, H, r.x + r.w / 2 - (int)strlen(L[i]) * 4, r.y + 12, L[i], INK, 1);
+            text(rgba, W, H, r.x + r.w / 2 - (int)strlen(lab) * 4,
+                 r.y + (r.h - 16) / 2, lab, INK, 1);
         }
     }
+}
+
+void tc_ui_render_top(const tc_ui *ui, uint8_t *rgba, int W, int H) {
+    tc_layout L = tc_ui_layout(W, H);
+    L.bar_h = 24; L.log_h = H - 24;
+    L.thumb_w = 100; L.thumb_h = 58; L.thumb_gap = 8;
+    fill(rgba, W, H, 0, 0, W, H, BG);
+    render_bar_and_log(ui, rgba, W, H, L, 8);
+}
+
+void tc_ui_render_bottom(const tc_ui *ui, uint8_t *rgba, int W, int H) {
+    tc_layout L = tc_ui_layout(W, H);
+    fill(rgba, W, H, 0, 0, W, H, BG);
+    render_canvas_and_tools(ui, rgba, W, H, L);
+}
+
+void tc_ui_render(const tc_ui *ui, uint8_t *rgba, int W, int H) {
+    tc_layout L = tc_ui_layout(W, H);
+    fill(rgba, W, H, 0, 0, W, H, BG);
+    render_bar_and_log(ui, rgba, W, H, L, L.compact ? 12 : 16);
+    render_canvas_and_tools(ui, rgba, W, H, L);
 }
