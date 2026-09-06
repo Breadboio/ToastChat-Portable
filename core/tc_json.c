@@ -40,7 +40,14 @@ const char *tc_json_top(const char *doc, const char *key) {
             continue;
         }
         if (*p == '{' || *p == '[') depth++;
-        else if (*p == '}' || *p == ']') { depth--; if (depth < 0) return NULL; }
+        else if (*p == '}' || *p == ']') {
+            depth--;
+            /* Stop at the end of the object we were handed. Without this the
+             * scan runs on into whatever follows in the buffer, so asking a
+             * system log entry for "png" happily returns the NEXT entry's
+             * image. Elements of an array are not NUL-terminated slices. */
+            if (depth <= 0) return NULL;
+        }
         p++;
     }
     return NULL;
@@ -83,4 +90,74 @@ int tc_json_top_int(const char *doc, const char *key, int dflt) {
     if (*v == '-') { sign = -1; v++; }
     while (*v >= '0' && *v <= '9') { n = n * 10 + (*v - '0'); v++; any = 1; }
     return any ? sign * n : dflt;
+}
+
+int tc_json_top_str(const char *doc, const char *key, char *out, size_t outn) {
+    const char *v = tc_json_top(doc, key);
+    size_t o = 0;
+    if (!v || *v != '"' || outn == 0) { if (outn) out[0] = '\0'; return -1; }
+    v++;
+    while (*v && *v != '"' && o + 1 < outn) {
+        if (*v == '\\' && v[1]) {
+            v++;
+            switch (*v) {
+                case 'n': out[o++] = '\n'; break;
+                case 't': out[o++] = '\t'; break;
+                case 'r': out[o++] = '\r'; break;
+                case 'u': /* not needed for nicks; emit '?' and skip */
+                    out[o++] = '?';
+                    if (v[1] && v[2] && v[3] && v[4]) v += 4;
+                    break;
+                default: out[o++] = *v; break;
+            }
+            v++;
+            continue;
+        }
+        out[o++] = *v++;
+    }
+    out[o] = '\0';
+    return (int)o;
+}
+
+const char *tc_json_top_raw(const char *doc, const char *key, size_t *len) {
+    const char *v = tc_json_top(doc, key);
+    const char *p;
+    if (!v || *v != '"') return NULL;
+    p = v + 1;
+    while (*p) {
+        if (*p == '\\' && p[1]) { p += 2; continue; }
+        if (*p == '"') break;
+        p++;
+    }
+    *len = (size_t)(p - (v + 1));
+    return v + 1;
+}
+
+const char *tc_json_array_first(const char *arr) {
+    const char *p = arr;
+    if (!p || *p != '[') return NULL;
+    p++;
+    while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+    return (*p == ']' || *p == '\0') ? NULL : p;
+}
+
+const char *tc_json_array_next(const char *elem) {
+    int depth = 0;
+    const char *p = elem;
+    if (!p) return NULL;
+    for (;;) {
+        if (!*p) return NULL;
+        if (*p == '"') { p = skip_string(p); continue; }
+        if (*p == '[' || *p == '{') { depth++; p++; continue; }
+        if (*p == ']' || *p == '}') {
+            if (depth == 0) return NULL;      /* end of the containing array */
+            depth--; p++; continue;
+        }
+        if (*p == ',' && depth == 0) {
+            p++;
+            while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+            return *p ? p : NULL;
+        }
+        p++;
+    }
 }

@@ -38,6 +38,37 @@ int main(void) {
     eq("max after tricky string", tc_json_top_int(tricky, "max", -1), 7);
     eq("array len on non-array", tc_json_array_len(tc_json_top(hello, "max")), -1);
 
+    {
+        const char *log = "{\"t\":\"joined\",\"log\":["
+            "{\"kind\":\"sys\",\"text\":\"a entered\"},"
+            "{\"kind\":\"msg\",\"nick\":\"Bre\\\"ad\",\"w\":64,\"h\":48,"
+            "\"png\":\"data:image/png;base64,AAAB\"},"
+            "{\"kind\":\"msg\",\"nick\":\"Wii\",\"w\":10,\"h\":20}]}";
+        const char *e = tc_json_array_first(tc_json_top(log, "log"));
+        char nick[16]; size_t rl = 0; const char *raw;
+        int n = 0;
+        while (e) { n++; e = tc_json_array_next(e); }
+        eq("iterate log -> 3 entries", n, 3);
+
+        e = tc_json_array_first(tc_json_top(log, "log"));
+        tc_json_top_str(e, "kind", nick, sizeof(nick));
+        eq("elem 1 kind is sys", strcmp(nick, "sys") == 0, 1);
+
+        e = tc_json_array_next(e);
+        tc_json_top_str(e, "nick", nick, sizeof(nick));
+        eq("escaped quote in nick", strcmp(nick, "Bre\"ad") == 0, 1);
+        eq("elem 2 w", tc_json_top_int(e, "w", -1), 64);
+        raw = tc_json_top_raw(e, "png", &rl);
+        eq("raw png length", (int)rl, (int)strlen("data:image/png;base64,AAAB"));
+        eq("raw png not copied", raw && strncmp(raw, "data:image/png;", 15) == 0, 1);
+
+        e = tc_json_array_next(e);
+        tc_json_top_str(e, "nick", nick, sizeof(nick));
+        eq("elem 3 nick", strcmp(nick, "Wii") == 0, 1);
+        eq("elem 3 is last", tc_json_array_next(e) == NULL, 1);
+        eq("empty array first -> NULL", tc_json_array_first("[]") == NULL, 1);
+    }
+
     printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASS", fails, fails == 1 ? "" : "s");
     return fails ? 1 : 0;
 }

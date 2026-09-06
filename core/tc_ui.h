@@ -7,7 +7,9 @@
 
 typedef struct {
     char           nick[12];
-    int            w, h;
+    int            w, h;         /* pixels actually used inside the buffer   */
+    int            stride;       /* buffer row width; >= w (thumbnails are
+                                  * decoded into a fixed-size box)           */
     const uint8_t *rgba;         /* decoded thumbnail, or NULL for a placeholder */
 } tc_ui_entry;
 

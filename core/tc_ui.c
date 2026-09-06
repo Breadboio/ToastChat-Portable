@@ -129,16 +129,26 @@ static void draw_thumb(uint8_t *b, int W, int H, const tc_ui_entry *e,
     fill(b, W, H, x, y, tw, th, PAPER);
     frame(b, W, H, x, y, tw, th, EDGE);
     if (e->rgba && e->w > 0 && e->h > 0) {
-        for (j = 0; j < th - 2; j++) {
-            int sy = j * e->h / (th - 2);
-            for (i = 0; i < tw - 2; i++) {
-                int sx = i * e->w / (tw - 2);
-                const uint8_t *s = e->rgba + ((size_t)sy * e->w + sx) * 4;
+        /* Fit inside the box preserving aspect, centred - drawings are wide
+         * strips and stretching them to a 3:2 box looks wrong. */
+        int bw = tw - 2, bh = th - 2;
+        int dw = bw, dh = (int)((long)e->h * bw / e->w);
+        int ox, oy;
+        if (dh > bh) { dh = bh; dw = (int)((long)e->w * bh / e->h); }
+        if (dw < 1) dw = 1;
+        if (dh < 1) dh = 1;
+        ox = x + 1 + (bw - dw) / 2;
+        oy = y + 1 + (bh - dh) / 2;
+        for (j = 0; j < dh; j++) {
+            int sy = j * e->h / dh;
+            for (i = 0; i < dw; i++) {
+                int sx = i * e->w / dw;
+                const uint8_t *s = e->rgba + ((size_t)sy * e->stride + sx) * 4;
                 float a = s[3] / 255.0f;
                 uint32_t c = ((uint32_t)(s[0] * a + 0xf4 * (1 - a)) << 16) |
                              ((uint32_t)(s[1] * a + 0xf1 * (1 - a)) << 8)  |
                               (uint32_t)(s[2] * a + 0xe8 * (1 - a));
-                px_set(b, W, H, x + 1 + i, y + 1 + j, c);
+                px_set(b, W, H, ox + i, oy + j, c);
             }
         }
     } else {

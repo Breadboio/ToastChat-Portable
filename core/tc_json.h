@@ -19,4 +19,18 @@ int tc_json_array_len(const char *arr);
 
 /* Convenience: top-level integer, or `dflt`. */
 int tc_json_top_int(const char *doc, const char *key, int dflt);
+
+/* Copy a top-level string value out, unescaping \" and \\. Always NUL
+ * terminates. Returns the length written, or -1 if the key is missing. */
+int tc_json_top_str(const char *doc, const char *key, char *out, size_t outn);
+
+/* Raw pointer into a top-level string value, WITHOUT unescaping or copying -
+ * for the multi-megabyte base64 payloads, which contain no escapes. */
+const char *tc_json_top_raw(const char *doc, const char *key, size_t *len);
+
+/* Iterate array elements. `first` takes the '[' and returns the first element
+ * (NULL if empty); `next` takes an element and returns the one after it. Both
+ * return a pointer suitable for passing straight back into tc_json_top(). */
+const char *tc_json_array_first(const char *arr);
+const char *tc_json_array_next(const char *elem);
 #endif
