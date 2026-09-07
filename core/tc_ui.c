@@ -117,6 +117,13 @@ tc_layout tc_ui_layout(int W, int H) {
     memset(&L, 0, sizeof(L));
     L.compact = (W < 900);
     L.dual = (W < 400);
+    /* A portrait phone. Every console is landscape - the Wii is the tallest at
+     * H = 0.75W - so nothing existing can reach this branch. */
+    L.tall = (!L.dual && H * 5 >= W * 6);
+    /* An 8x16 glyph at scale 1 is ~27 device px once a 640-wide logical
+     * screen is upscaled to a 1080-wide panel - legible, but far smaller in
+     * proportion than the same font on a Wii. Phones get double. */
+    L.text_scale = L.tall ? 2 : 1;
     if (L.dual) {
         /* 3DS bottom screen, 320x240: no status bar and no log here - those
          * live on the top screen - so the whole height is canvas + toolbar. */
@@ -136,6 +143,27 @@ tc_layout tc_ui_layout(int W, int H) {
         L.btn_w = 110; L.btn_h = 40; L.btn_pitch = 118;
         L.btn_x = W - 16 - (3 * 110 + 2 * 8); L.btn_y = L.sw_y;
         L.thumb_w = 180; L.thumb_h = 118; L.thumb_gap = 12;
+    } else if (L.tall) {
+        /* Portrait phone. The toolbar is the 640x480 one unchanged - it is
+         * tuned for a 640-wide screen and the phone target renders at 640 - but
+         * the log and canvas SPLIT the leftover height instead of the log
+         * taking a fixed 152px. On a 640x1387 phone the fixed slice would have
+         * given the log 11% of the screen. */
+        int avail;
+        /* Everything here is sized for scale-2 text: the bar holds a 32px
+         * glyph, CLEAR needs 5*16=80px of label, and the toolbar is two rows
+         * deep. The leftover height at the bottom is deliberate - it keeps the
+         * SEND button clear of the gesture-navigation strip. */
+        L.bar_h = 44; L.tool_h = 116;
+        avail = H - L.bar_h - L.tool_h;
+        if (avail < 120) avail = 120;
+        L.log_h = avail * 2 / 5;                 /* log 40%, canvas 60% */
+        L.sw_size = 30; L.sw_pitch = 34; L.sw_x = 12; L.sw_cols = 8;
+        L.sw_y = H - L.tool_h + 10;
+        L.pen_size = 28; L.pen_pitch = 32; L.pen_x = 292; L.pen_y = L.sw_y;
+        L.btn_w = 88; L.btn_h = 38; L.btn_pitch = 96;
+        L.btn_x = 292; L.btn_y = L.sw_y + 34;
+        L.thumb_w = 108; L.thumb_h = 62; L.thumb_gap = 10;
     } else {
         /* 640x480: swatches wrap to two rows of eight and the buttons sit under
          * the pen row. Sixteen swatches in one row would want 624 of 640px. */
@@ -178,6 +206,9 @@ tc_rect tc_ui_room_rect(int W, int H) {
     if (L.dual) {
         r.x = L.pen_x + 6 * L.pen_pitch + 6; r.y = L.pen_y;
         r.w = W - r.x - 6; r.h = 14;
+    } else if (L.tall) {
+        r.x = L.pen_x + 6 * L.pen_pitch + 8; r.y = L.pen_y;
+        r.w = 76; r.h = 30;                    /* "RM C" is 4*16 = 64px wide */
     } else if (L.compact) {
         r.x = L.pen_x + 6 * L.pen_pitch + 10; r.y = L.pen_y;
         r.w = 66; r.h = 28;
@@ -198,8 +229,10 @@ tc_rect tc_ui_button_rect(int W, int H, int i) {
 
 /* One log row, PictoChat-style: a coloured name chip, the drawing beside it,
  * a dashed rule underneath. System lines get the pale notice treatment. */
-#define TC_ROW_MSG(L) ((L).compact ? ((L).dual ? 62 : 64) : 112)
-#define TC_ROW_SYS(L) ((L).compact ? 18 : 24)
+/* tall is checked first: it implies compact. A scale-2 glyph is 32px, so
+ * the old 18px system row could not contain one. */
+#define TC_ROW_MSG(L) ((L).tall ? 72 : ((L).compact ? ((L).dual ? 62 : 64) : 112))
+#define TC_ROW_SYS(L) ((L).tall ? 38 : ((L).compact ? 18 : 24))
 
 int tc_ui_visible_rows(const tc_ui *ui, int W, int H) {
     tc_layout L = tc_ui_layout(W, H);
@@ -214,14 +247,18 @@ int tc_ui_visible_rows(const tc_ui *ui, int W, int H) {
 }
 
 static void draw_row(uint8_t *b, int W, int H, const tc_ui_entry *e,
-                     int x, int y, int w, int h, int compact) {
-    int chip_w = 88;   /* 10 chars at 8px + padding: the server nick limit */
-    int chip_h = compact ? 13 : 17;
+                     int x, int y, int w, int h, tc_layout L) {
+    int compact = L.compact;
+    int ts = L.text_scale;
+    /* The chip holds the server's 10-character nick limit, so it has to grow
+     * with the glyphs: 10 * 8 * scale + padding. */
+    int chip_w = 10 * 8 * ts + 8;
+    int chip_h = (compact ? 13 : 17) + (ts - 1) * 20;
     int pad = compact ? 4 : 6;
 
     if (e->is_sys) {
         fill(b, W, H, x, y, w, h, PC_SYS);
-        text(b, W, H, x + pad + 2, y + (h - 16) / 2, e->text, PC_SYS_INK, 1);
+        text(b, W, H, x + pad + 2, y + (h - 16 * ts) / 2, e->text, PC_SYS_INK, ts);
         fill(b, W, H, x, y + h - 1, w, 1, PC_DIVIDER);
         return;
     }
@@ -230,12 +267,12 @@ static void draw_row(uint8_t *b, int W, int H, const tc_ui_entry *e,
     round_rect(b, W, H, x + pad, y + pad, chip_w, chip_h, 3,
                e->color ? e->color : 0x8c8f94);
     {
-        int maxch = (chip_w - 6) / 8;
+        int maxch = (chip_w - 6) / (8 * ts);
         char n[12];
         int i = 0;
         while (e->nick[i] && i < maxch && i < 11) { n[i] = e->nick[i]; i++; }
         n[i] = '\0';
-        text(b, W, H, x + pad + 3, y + pad + (chip_h - 16) / 2 + 1, n, 0xffffff, 1);
+        text(b, W, H, x + pad + 3, y + pad + (chip_h - 16 * ts) / 2 + 1, n, 0xffffff, ts);
     }
 
     if (e->rgba && e->w > 0 && e->h > 0) {
@@ -273,37 +310,54 @@ static void render_bar_and_log(const tc_ui *ui, uint8_t *rgba, int W, int H,
     int i, ty, msg_h, sys_h, top, bottom, y;
 
     /* --- chrome bar --- */
+    {
+    int ts = L.text_scale;
+    int gw = 8 * ts;                 /* one glyph's advance */
+    int rx, dot_y, occ_dx;
     vgrad(rgba, W, H, 0, 0, W, L.bar_h, PC_CHROME_HI, PC_CHROME);
     fill(rgba, W, H, 0, L.bar_h - 1, W, 1, PC_LINE);
-    ty = (L.bar_h - 16) / 2;
+    ty = (L.bar_h - 16 * ts) / 2;
     if (ty < 0) ty = 0;
+    dot_y = ty + (16 * ts - 9) / 2;
+    /* 68px at scale 1, which is what this was before the scale existed. */
+    occ_dx = 6 * gw + 20 * ts;
 
-    if (W >= 360) {
-        text(rgba, W, H, pad, ty, "TOASTCHAT", PC_HEADING, 1);
+    if (L.tall) {
+        /* At scale 2 the wordmark alone is 9*16 = 144px and the bar still has
+         * to carry room, occupancy and status. Drop it - the app's own name is
+         * the least informative thing up there, and it is on the launcher icon. */
+        round_rect(rgba, W, H, pad, dot_y, 9, 9, 2, ui->connected ? OK : BAD);
+        rx = pad + 9 + gw;
+    } else if (W >= 360) {
+        text(rgba, W, H, pad, ty, "TOASTCHAT", PC_HEADING, ts);
         round_rect(rgba, W, H, pad + 84, ty + 3, 9, 9, 2, ui->connected ? OK : BAD);
         text(rgba, W, H, pad + 100, ty, ui->connected ? "ONLINE" : "OFFLINE",
-             ui->connected ? OK : BAD, 1);
+             ui->connected ? OK : BAD, ts);
+        rx = pad + 200;
     } else {
         round_rect(rgba, W, H, pad, ty + 3, 9, 9, 2, ui->connected ? OK : BAD);
+        rx = pad + 16;
     }
     {
-        int rx = (W >= 360) ? pad + 200 : pad + 16;
         if (ui->room >= 'A' && ui->room <= 'D') {
             int k = 0;
             memcpy(buf, "ROOM ", 5); buf[5] = ui->room; buf[6] = '\0';
-            text(rgba, W, H, rx, ty, buf, PC_HEADING, 1);
+            text(rgba, W, H, rx, ty, buf, PC_HEADING, ts);
             if (ui->people >= 10) buf[k++] = (char)('0' + ui->people / 10);
             buf[k++] = (char)('0' + ui->people % 10); buf[k++] = '/';
             if (ui->max >= 10) buf[k++] = (char)('0' + ui->max / 10);
             buf[k++] = (char)('0' + ui->max % 10); buf[k] = '\0';
-            text(rgba, W, H, rx + 68, ty, buf, PC_INK_SOFT, 1);
+            text(rgba, W, H, rx + occ_dx, ty, buf, PC_INK_SOFT, ts);
         } else {
-            text(rgba, W, H, rx, ty, "LOBBY", PC_INK_SOFT, 1);
+            text(rgba, W, H, rx, ty, "LOBBY", PC_INK_SOFT, ts);
         }
     }
     if (ui->status) {
-        int sx = W - pad - (int)strlen(ui->status) * 8;
-        if (sx > pad + 300 || W < 360) text(rgba, W, H, sx, ty, ui->status, PC_INK_SOFT, 1);
+        int sx = W - pad - (int)strlen(ui->status) * gw;
+        /* Only draw the status if it cannot collide with the room block. */
+        int min_sx = L.tall ? (rx + occ_dx + 5 * gw + 8) : (pad + 300);
+        if (sx > min_sx || W < 360) text(rgba, W, H, sx, ty, ui->status, PC_INK_SOFT, ts);
+    }
     }
 
     /* --- log: newest at the bottom, older scrolling up off the top --- */
@@ -318,10 +372,11 @@ static void render_bar_and_log(const tc_ui *ui, uint8_t *rgba, int W, int H,
         int rh = ui->log[i].is_sys ? sys_h : msg_h;
         y -= rh;
         if (y < top) break;
-        draw_row(rgba, W, H, &ui->log[i], 0, y, W, rh, L.compact);
+        draw_row(rgba, W, H, &ui->log[i], 0, y, W, rh, L);
     }
     if (ui->nlog == 0)
-        text(rgba, W, H, pad, top + L.log_h / 2 - 8, "NOTHING DRAWN YET", PC_INK_FAINT, 1);
+        text(rgba, W, H, pad, top + L.log_h / 2 - 8 * L.text_scale,
+             "NOTHING DRAWN YET", PC_INK_FAINT, L.text_scale);
 
     /* Scrollbar: only when there is more than fits, so it does not nag. */
     {
@@ -391,10 +446,11 @@ static void render_canvas_and_tools(const tc_ui *ui, uint8_t *rgba, int W, int H
         lab[3] = (ui->room >= 'A' && ui->room <= 'D') ? ui->room : '-';
         lab[4] = '\0';
         if (L.dual) { lab[0] = lab[3]; lab[1] = '\0'; }
-        lw = (int)strlen(lab) * 8;
+        lw = (int)strlen(lab) * 8 * L.text_scale;
         round_rect(rgba, W, H, r.x, r.y, r.w, r.h, 3, PC_PAGE);
         frame(rgba, W, H, r.x, r.y, r.w, r.h, PC_LINE);
-        text(rgba, W, H, r.x + (r.w - lw) / 2, r.y + (r.h - 16) / 2, lab, PC_ACCENT, 1);
+        text(rgba, W, H, r.x + (r.w - lw) / 2, r.y + (r.h - 16 * L.text_scale) / 2,
+             lab, PC_ACCENT, L.text_scale);
     }
     {
         static const char *Lb[3] = { "UNDO", "CLEAR", "SEND" };
@@ -406,8 +462,8 @@ static void render_canvas_and_tools(const tc_ui *ui, uint8_t *rgba, int W, int H
             uint32_t ink = (i == 2) ? 0xffffff : PC_INK;
             round_rect(rgba, W, H, r.x, r.y, r.w, r.h, 4, bgc);
             frame(rgba, W, H, r.x, r.y, r.w, r.h, (i == 2) ? PC_ACCENT : PC_LINE);
-            text(rgba, W, H, r.x + r.w / 2 - (int)strlen(lab) * 4,
-                 r.y + (r.h - 16) / 2, lab, ink, 1);
+            text(rgba, W, H, r.x + r.w / 2 - (int)strlen(lab) * 4 * L.text_scale,
+                 r.y + (r.h - 16 * L.text_scale) / 2, lab, ink, L.text_scale);
         }
     }
 }

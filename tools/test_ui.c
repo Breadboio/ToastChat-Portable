@@ -17,6 +17,10 @@ int main(int argc, char **argv) {
     (void)argc; (void)argv;
     render_one("/src/build/ui_switch.png", 1280, 720);
     render_one("/src/build/ui_wii.png", 640, 480);
+    /* Android renders 640 wide with the height taken from the panel aspect;
+     * 1422 is a 1080x2400 phone, 1024 is a 1600x2560 tablet. */
+    render_one("/src/build/ui_android_phone.png", 640, 1422);
+    render_one("/src/build/ui_android_tablet.png", 640, 1024);
     return 0;
 }
 

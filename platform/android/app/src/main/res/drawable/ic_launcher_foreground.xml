@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A drawing page with a stroke on it, in the web client's palette:
+     PC_INK #2B3340 for the page outline, PC_ACCENT-ish teal #2FA89A for the
+     ink (TC_PALETTE[9], the default pen colour the app starts on).
+     108x108 viewport; adaptive icons only guarantee the middle 72x72, so the
+     art stays inside roughly 24..84. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#2B3340"
+        android:strokeWidth="3"
+        android:pathData="M32,37 L76,37 A5,5 0 0 1 81,42 L81,66 A5,5 0 0 1 76,71 L32,71 A5,5 0 0 1 27,66 L27,42 A5,5 0 0 1 32,37 Z" />
+
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#2FA89A"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:pathData="M35,60 C42,44 49.5,44 54,54 C58.5,64 66,64 73,48" />
+</vector>

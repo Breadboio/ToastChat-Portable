@@ -33,9 +33,12 @@ typedef struct {
 typedef struct { int x, y, w, h; } tc_rect;
 
 /* One layout computed from the screen size. Wide = Switch/desktop (1280x720),
- * compact = Wii/Dreamcast (640x480), where 16 swatches in a row do not fit. */
+ * compact = Wii/Dreamcast (640x480), where 16 swatches in a row do not fit.
+ * tall = a portrait phone, where the log and canvas share the height instead
+ * of the log taking a fixed slice - no console is anywhere near that aspect. */
 typedef struct {
-    int compact, dual;
+    int compact, dual, tall;
+    int text_scale;             /* glyph multiplier; 2 on a phone */
     int bar_h, log_h, tool_h;
     int sw_size, sw_pitch, sw_x, sw_y, sw_cols;
     int pen_size, pen_pitch, pen_x, pen_y;

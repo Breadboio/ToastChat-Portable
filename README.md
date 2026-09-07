@@ -1,13 +1,13 @@
 # ToastChat Portable
 
 A second, independent build of ToastChat: a native client in portable C99 that
-talks to the **existing, unmodified** ToastChat server. Targets 3DS first, then
-Wii U, Wii, Dreamcast and Android from the same core.
+talks to the **existing, unmodified** ToastChat server. Targets 3DS, Switch,
+Wii and Android from the same core, with Wii U and Dreamcast to follow.
 
 This tree does not touch `~/breadtoasting/toastchat` (prod). It speaks the
 server's real wire protocol, documented and verified in `docs/PROTOCOL.md`.
 
-## Status — 2026-09-06
+## Status — 2026-09-07
 
 Switch is target #1 (user has an unpatched Erista — software-only RCM entry).
 
@@ -19,15 +19,18 @@ Switch is target #1 (user has an unpatched Erista — software-only RCM entry).
 | **Switch** (`.nro`, 254KB) | builds clean; framebuffer + touchscreen written; **never run** |
 | **Wii** (`boot.dol`, 368KB) | builds clean; net_* sockets, YUV 4:2:2 blit (round-trip verified), Wiimote IR; **never run** |
 | **3DS** (`.3dsx`, 164KB) | builds clean; **RUNS IN AZAHAR** - boots, renders both screens, connects, joins a room |
-| JSON parsing (jsmn) | not wired - status is substring-matched, so people-count stays 0 |
-| Receiving others' drawings | not written (thumbnails show a placeholder) |
-| Run on real hardware | **not done on any of the three** |
+| **Android** (`.apk`, 2.78MB) | builds clean for 3 ABIs; layout + touch verified on x86; **never run** (no /dev/kvm or /dev/binder on this box) |
+| JSON parsing | `core/tc_json.c`, a depth-aware no-allocation scanner; roster counts work (jsmn is still vendored for the receive path only) |
+| Receiving others' drawings | `core/tc_recv.c`, wired into the app loop; replays the backlog and handles live entries into a fixed thumbnail pool |
+| Run on real hardware | **not done on any of the four**; the 3DS has run in an emulator, nothing else has run anywhere |
 
-No host toolchain and no sudo needed: both builds run in Docker via
-`devkitpro/devkita64` and `gcc:13`.
+No host toolchain and no sudo needed for the console targets: those builds run
+in Docker via `devkitpro/devkita64` and `gcc:13`. Android is the exception - it
+uses the host SDK/NDK, since there is no official image to borrow.
 
     tools/build-posix.sh 127.0.0.1 3401 C   # compile + unit + live test
     tools/build-switch.sh                   # -> build/ToastChat.nro
+    tools/build-android.sh                  # -> build/ToastChat-Android-debug.apk
 
 The `.nro` **has never been run.** It compiles and the identical core passes
 live protocol tests on x86, which is not the same thing — see
@@ -50,13 +53,13 @@ groups: sockets, video blit, one pointer, time, allocation. Everything else
 (handshake, framing, JSON, PNG, drawing, state machine) is shared C99 in `core/`,
 so a port cannot get the protocol subtly wrong.
 
-    platform/sdl2/       desktop dev target — build and iterate here first
-    platform/3ds/        devkitARM + libctru + citro2d
+    platform/posix/      desktop/CI target — build and iterate here first
+    platform/3ds/        devkitARM + libctru (dual screen; runs in Azahar)
     platform/switch/     devkitA64 + libnx (touchscreen; easiest target - see its NOTES.md)
+    platform/wii/        devkitPPC + libogc (IR pointer, YUV framebuffer)
+    platform/android/    NDK + NativeActivity, no Java at all - see its NOTES.md
     platform/wiiu/       devkitPPC + wut
-    platform/wii/        devkitPPC + libogc (IR pointer)
     platform/dreamcast/  KallistiOS, SH-4 (mouse or stick cursor)
-    platform/android/    NDK
 
 Build the SDL2 target first, always. It is the only one that can be iterated on
 without hardware, and a bug found there is a bug not shipped to five consoles.

@@ -7,3 +7,17 @@ build/
 *.dol
 *.rpx
 *.AppImage
+
+# mbedtls source, fetched by tools/build-android.sh (27MB of vendored upstream)
+third_party/mbedtls/
+# Android build products and local SDK paths
+platform/android/.gradle/
+platform/android/app/build/
+platform/android/local.properties
+platform/android/.cxx/
+platform/android/app/.cxx/
+# Android release signing - the key must NEVER be committed
+platform/android/keystore.properties
+*.jks
+*.keystore
+*.apk
