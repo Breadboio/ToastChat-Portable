@@ -61,8 +61,11 @@ so a port cannot get the protocol subtly wrong.
     platform/wiiu/       devkitPPC + wut
     platform/dreamcast/  KallistiOS, SH-4 (mouse or stick cursor)
 
-Build the SDL2 target first, always. It is the only one that can be iterated on
-without hardware, and a bug found there is a bug not shipped to five consoles.
+Build for the host first, always. `platform/posix/` runs the protocol against a
+real server in `gcc:13`, and the pure-C parts of a port (layouts, rasteriser,
+touch handling) can be rendered to PNG or unit-tested there too — a bug found on
+x86 is a bug not shipped to five consoles. `platform/sdl2/` is still unwritten;
+the POSIX target has covered the dev loop so far.
 
 ## Constraints the core must respect
 
@@ -70,11 +73,15 @@ without hardware, and a bug found there is a bug not shipped to five consoles.
 - **Dreamcast sets the memory budget**: 16MB main RAM. The largest single
   allocation is a 40-entry `joined` log of inline base64 PNGs; `TC_LOG_KEEP`
   exists to cap what a port actually decodes.
-- **No TLS.** The LAN build is plain `ws://`. Defensible here (the server holds
-  no credentials and its log is world-readable), but revisit before any port
-  points at the public internet — see docs/PROTOCOL.md §7 and the TLS finding:
-  breadtoasting.com serves an **ECDSA-only** cert chaining to GTS Root R4, which
-  no 3DS-era console can validate, and RSA-only clients fail the handshake outright.
+- **TLS is per-port, and it works** (since 2026-09-06). The 3DS, Switch and
+  Android builds bundle mbedtls 2.28.x with our own trust anchors in
+  `core/tc_cacert.h`, so they reach `wss://breadtoasting.com` directly. The
+  earlier "consoles cannot do TLS" reading was too pessimistic — it assumed
+  using the console's own 2011-era root store. Bundling the anchor sidesteps
+  that entirely. **The Wii is the exception**: devkitPro ships no mbedtls
+  portlib for it, so it stays plain `ws://` on :80 — which means turning on
+  Cloudflare "Always Use HTTPS" for this zone would break the Wii client.
+  Dreamcast will face the same question; KallistiOS is its own toolchain.
 
 ## Setting up the toolchain (needs sudo — run these yourself)
 
