@@ -13,7 +13,7 @@ android {
     ndkVersion = "27.2.12479018"
 
     defaultConfig {
-        applicationId = "com.breadtoasting.toastchat"
+        applicationId = "com.breadtoasting.toastchat.portable"
         // NativeActivity's onInputEvent/looper contract used here is stable
         // well below this, but 24 is the floor for a comfortable NDK toolchain.
         minSdk = 24
